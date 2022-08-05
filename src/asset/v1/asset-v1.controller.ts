@@ -1,67 +1,74 @@
-import {Body, Controller, Get, Param, Post, UploadedFile} from '@nestjs/common';
 import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiTags,
-} from '@nestjs/swagger';
-import {ApiFile} from "../../decorator/api-file.decorator";
-import {ParseFile} from "../../pipe/parse-file.pipe";
-import {fileMimetypeFilter} from "../../filter/file-mimetype.filter";
-import {AssetV1Service} from "./asset-v1.service";
-import {AssetInfoDto} from "./dto/asset-v1.dto";
-import {CommonResponseDto} from "../../commom/dto/common-response.dto";
-import {AssetEntity} from "../repository/asset.entity";
-import {GameApiHttpStatus} from "../../exception/request.exception";
-import {AssetInfo} from "./type/file-info";
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  UploadedFile,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiFile } from '../../decorator/api-file.decorator';
+import { ParseFile } from '../../pipe/parse-file.pipe';
+import { fileMimetypeFilter } from '../../filter/file-mimetype.filter';
+import { AssetV1Service } from './asset-v1.service';
+import { AssetInfoDto } from './dto/asset-v1.dto';
+import { CommonResponseDto } from '../../commom/dto/common-response.dto';
+import { AssetEntity } from '../repository/asset.entity';
+import { GameApiHttpStatus } from '../../exception/request.exception';
+import { AssetInfo } from './type/file-info';
 
 @ApiBearerAuth()
 @ApiTags('Asset API')
 @Controller({
-    version: '1',
+  version: '1',
 })
 export class AssetV1Controller {
-    constructor(private readonly apiV1Service: AssetV1Service) {}
+  constructor(private readonly apiV1Service: AssetV1Service) {}
 
-    @Post('asset')
-    @ApiOperation({ summary: 'upload asset' })
-    @ApiFile('file', true,{
-        fileFilter: fileMimetypeFilter('image'),
-        limits: {fileSize: 10000000 } //10MB
-    })
-    async uploadImage(
-        @UploadedFile(ParseFile) file: Express.Multer.File
-    ): Promise<CommonResponseDto<AssetInfo>> {
-        const result = await this.apiV1Service.uploadImage(file);
-        return new CommonResponseDto<AssetInfo>(
-            GameApiHttpStatus.OK,
-            'success',
-            result
-        )
+  @Post('asset')
+  @ApiOperation({ summary: 'upload asset' })
+  @ApiFile('file', true, {
+    fileFilter: fileMimetypeFilter('image'),
+    limits: { fileSize: 15000000 }, //10MB
+  })
+  async uploadImage(
+    @UploadedFile(ParseFile) file: Express.Multer.File,
+  ): Promise<CommonResponseDto<AssetInfo>> {
+    try {
+      const result = await this.apiV1Service.uploadImage(file);
+      return new CommonResponseDto<AssetInfo>(
+        GameApiHttpStatus.OK,
+        'success',
+        result,
+      );
+    } catch (e) {
+      throw e;
     }
+  }
 
-    @Post('asset-by-url')
-    @ApiOperation({ summary: 'upload asset by public url' })
-    async uploadImageByUrl(
-        @Body() assetInfoDto: AssetInfoDto,
-    ): Promise<CommonResponseDto<AssetInfo>> {
-        const result = await this.apiV1Service.uploadImageByUrl(assetInfoDto);
-        return new CommonResponseDto<AssetInfo>(
-            GameApiHttpStatus.OK,
-            'success',
-            result
-        )
-    }
+  @Post('asset-by-url')
+  @ApiOperation({ summary: 'upload asset by public url' })
+  async uploadImageByUrl(
+    @Body() assetInfoDto: AssetInfoDto,
+  ): Promise<CommonResponseDto<AssetInfo>> {
+    const result = await this.apiV1Service.uploadImageByUrl(assetInfoDto);
+    return new CommonResponseDto<AssetInfo>(
+      GameApiHttpStatus.OK,
+      'success',
+      result,
+    );
+  }
 
-    @Get('asset/:assetName')
-    @ApiOperation({ summary: 'get asset info' })
-    async getImageByName(
-        @Param('assetName') assetName: string
-    ): Promise<CommonResponseDto<AssetEntity>> {
-        const result = await this.apiV1Service.getImageByName(assetName);
-        return new CommonResponseDto<AssetEntity>(
-            GameApiHttpStatus.OK,
-            'success',
-            result
-        )
-    }
+  @Get('asset/:assetName')
+  @ApiOperation({ summary: 'get asset info' })
+  async getImageByName(
+    @Param('assetName') assetName: string,
+  ): Promise<CommonResponseDto<AssetEntity>> {
+    const result = await this.apiV1Service.getImageByName(assetName);
+    return new CommonResponseDto<AssetEntity>(
+      GameApiHttpStatus.OK,
+      'success',
+      result,
+    );
+  }
 }

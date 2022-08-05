@@ -2,21 +2,19 @@ import {Injectable} from '@nestjs/common';
 import {ExternalServerException} from "../exception/external-server.exception";
 import * as sharp from "sharp";
 import axios from "axios";
-import {validate} from "class-validator";
 import * as Path from "path";
 import * as Fs from "fs";
 import * as fs from "fs";
 import {FileInfo} from "../asset/v1/type/file-info";
 import {ImageDto} from "../asset/v1/dto/asset-v1.dto";
+import {ConfigService} from "@nestjs/config";
+import {GameApiException, GameApiHttpStatus} from "../exception/request.exception";
 
 @Injectable()
 export class ImageUtil {
-    private fileSize: number;
     constructor(
-        fileSize: number
-    ) {
-        this.fileSize = fileSize
-    }
+        private configService: ConfigService
+    ) {}
 
     public async getImageBySharp(imageDto: ImageDto): Promise<FileInfo> {
         try {
@@ -33,56 +31,61 @@ export class ImageUtil {
             }
 
             if (!imageDto.isOriginal) {
-                sharpObject = sharpObject.resize({ width: this.fileSize }).blur(false).blur(true);
+                sharpObject = sharpObject.resize({ width: parseInt(this.configService.get('FILE_THUMBNAIL_SIZE')) }).blur(false).blur(true);
             }
 
-            await sharpObject.toFile(imageDto.filename);
+            // await sharpObject.toFile(imageDto.filename);
 
             const assetInfo: FileInfo = {
+                image: await sharpObject,
                 buffer: await sharpObject.toBuffer()
             }
             return assetInfo;
-        } catch (error) {
-            throw new ExternalServerException(error);
+        } catch (e) {
+            throw new GameApiException(
+                e.message,
+                e.stack,
+                GameApiHttpStatus.INTERNAL_SERVER_ERROR,
+            );
         }
     }
 
-    public async getImageByAxios (imageDto: ImageDto): Promise<FileInfo>  {
-        const url = imageDto.path;
-        const fileName = Path.basename(url);
-        const filePath = Path.resolve(__dirname, '../files', fileName)
-        this.mkdir(Path.dirname(filePath))
-        const writer = Fs.createWriteStream(filePath);
+    // public async getImageByAxios (imageDto: ImageDto): Promise<FileInfo>  {
+    //     const url = imageDto.path;
+    //     const fileName = Path.basename(url);
+    //     const filePath = Path.resolve(__dirname, '../files', fileName)
+    //     this.mkdir(Path.dirname(filePath))
+    //     const writer = Fs.createWriteStream(filePath);
+    //
+    //     try {
+    //         const response = await axios({
+    //             url,
+    //             method: 'GET',
+    //             responseType: 'stream'
+    //         })
+    //
+    //         const assetInfo: FileInfo = {
+    //             contentType: response.headers['content-type'],
+    //             // buffer: await Buffer.from(response.data, "utf8")
+    //             buffer: response.data
+    //         }
+    //
+    //         return assetInfo;
+    //
+    //         // response.data.pipe(writer);
+    //         // writer.on('finish', () => {
+    //         //     return fs.statSync(filePath).size;
+    //         // })
+    //     } catch (e) {
+    //         throw new ExternalServerException(e);
+    //     }
+    // }
 
-        try {
-            const response = await axios({
-                url,
-                method: 'GET',
-                responseType: 'stream'
-            })
-
-            const assetInfo: FileInfo = {
-                contentType: response.headers['content-type'],
-                // buffer: await Buffer.from(response.data, "utf8")
-                buffer: response.data
-            }
-
-            return assetInfo;
-
-            // response.data.pipe(writer);
-            // writer.on('finish', () => {
-            //     return fs.statSync(filePath).size;
-            // })
-        } catch (error) {
-            throw new ExternalServerException(error);
-        }
-    }
-
-    private mkdir(dirPath: string) {
-        const isExists = fs.existsSync(dirPath);
-        if( !isExists ) {
-            fs.mkdirSync(dirPath, { recursive: true });
-        }
-    }
+    // private mkdir(dirPath: string) {
+    //     const isExists = fs.existsSync(dirPath);
+    //     if( !isExists ) {
+    //         fs.mkdirSync(dirPath, { recursive: true });
+    //     }
+    // }
 
 }

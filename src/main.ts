@@ -6,6 +6,7 @@ import {WINSTON_MODULE_NEST_PROVIDER, WinstonModule} from 'nest-winston';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import {getLogFormat, logLevel} from './commom/logger/winston.config';
 import * as winston from 'winston';
+import {HttpExceptionFilter} from "./filter/http-exception.filter";
 // import {winstonLogger} from "./logger/logger.module";
 /*
   todo:
@@ -45,7 +46,7 @@ async function bootstrap() {
     const configService = app.get(ConfigService);
 
     app.useLogger(app.get(WINSTON_MODULE_NEST_PROVIDER));
-
+    app.useGlobalFilters(new HttpExceptionFilter());
     app.useGlobalPipes(
         new ValidationPipe({
             transform: true,

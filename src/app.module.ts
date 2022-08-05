@@ -8,7 +8,6 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { GameApiModule } from './game-api/game-api.module';
 import { TerminusModule } from '@nestjs/terminus';
-import { HttpModule } from '@nestjs/axios';
 import { TypeOrmModule, TypeOrmModuleAsyncOptions } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CoreModule } from './core/core.module';
@@ -21,7 +20,8 @@ import {AssetEntity} from "./asset/repository/asset.entity";
 import {AssetModule} from "./asset/asset.module";
 import {MetadataModule} from "./metadata/metadata.module";
 import {MetadataEntity} from "./metadata/repository/metadata.entity";
-import {ConvertPoolEntity} from "./game-api/repository/convert-pool.entitty";
+import {ConvertPoolEntity} from "./game-api/repository/convert-pool.entity";
+import {SequenceEntity} from "./game-api/repository/sequence.entity";
 
 @Module({
     imports: [
@@ -30,7 +30,6 @@ import {ConvertPoolEntity} from "./game-api/repository/convert-pool.entitty";
             envFilePath: `${process.cwd()}/.env.${process.env.NODE_ENV}`,
         }),
         TerminusModule,
-        HttpModule,
         WinstonModule.forRootAsync({
             useFactory: async (configService: ConfigService) => ({
                 format: getLogFormat(process.env.NODE_ENV),
@@ -47,7 +46,7 @@ import {ConvertPoolEntity} from "./game-api/repository/convert-pool.entitty";
                   username: configService.get('DB_USERNAME'),
                   password: configService.get('DB_PASSWORD'),
                   database: configService.get('DB_DATABASE'),
-                  entities: [ConvertPoolEntity, AssetEntity, MetadataEntity],
+                  entities: [ConvertPoolEntity, AssetEntity, MetadataEntity, SequenceEntity],
                   synchronize: configService.get('DB_SYNCHRONIZE') === 'true',
                   logging: true,
                   logger: new DatabaseLogger(process.env.NODE_ENV),

@@ -1,7 +1,7 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import {Body, Controller, Get, Headers, Param, Post} from '@nestjs/common';
 import { GameApiV1Service } from './game-api-v1.service';
-import { GameApiV1ConvertPoolDto } from './dto/game-api-v1.dto';
-import { ConvertPoolEntity } from '../repository/convert-pool.entitty';
+import {GameApiV1ConvertPoolDto, GameApiV1MintDto} from './dto/game-api-v1.dto';
+import { ConvertPoolEntity } from '../repository/convert-pool.entity';
 import {
     ApiBearerAuth,
     ApiOperation,
@@ -10,6 +10,7 @@ import {
 } from '@nestjs/swagger';
 import {CommonResponseDto} from "../../commom/dto/common-response.dto";
 import {GameApiHttpStatus} from "../../exception/request.exception";
+import {ExtensionDto} from "../../metadata/v1/dto/metadata-v1.dto";
 
 @ApiBearerAuth()
 @ApiTags('Game API')
@@ -28,8 +29,9 @@ export class GameApiV1Controller {
     })
     @ApiResponse({ status: 403, description: 'Forbidden.' })
     async mintNft(
+        @Body() gameApiV1MintDto: GameApiV1MintDto,
     ): Promise<CommonResponseDto<any>> {
-        const result = await this.gameApiService.mintNft();
+        const result = await this.gameApiService.mintNft(gameApiV1MintDto);
         return new CommonResponseDto(<any>
             GameApiHttpStatus.OK,
             'success',
@@ -161,5 +163,15 @@ export class GameApiV1Controller {
             'success',
             result
         )
+    }
+
+    @Get('send-request')
+    sendRequest(@Headers() headers) {
+        return this.gameApiService.sendRequest()
+    }
+
+    @Get('get-request')
+    getRequest(@Headers() headers): string {
+        return headers
     }
 }

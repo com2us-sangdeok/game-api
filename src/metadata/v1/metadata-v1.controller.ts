@@ -13,36 +13,36 @@ import {GameApiHttpStatus} from "../../exception/request.exception";
 @ApiBearerAuth()
 @ApiTags('Metadata API')
 @Controller({
-    version: '1',
+  version: '1',
 })
 export class MetadataV1Controller {
-    constructor(private readonly metadataV1Service: MetadataV1Service) {}
+  constructor(private readonly metadataV1Service: MetadataV1Service) {}
 
-    @Post('metadata')
-    @ApiOperation({ summary: 'upload metadata' })
-    async uploadMetadata(
-        @Body() extensionDto: ExtensionDto,
-    ): Promise<CommonResponseDto<Metadata>>  {
-        const result = await this.metadataV1Service.uploadMetadata(extensionDto)
+  @Post('metadata')
+  @ApiOperation({ summary: 'upload metadata' })
+  async uploadMetadata(
+    @Body() extensionDto: ExtensionDto,
+  ): Promise<CommonResponseDto<Metadata>> {
+    const result = await this.metadataV1Service.uploadMetadata(extensionDto);
 
-        return new CommonResponseDto<Metadata>(
-            GameApiHttpStatus.OK,
-            'success',
-            result
-        )
-    }
+    return new CommonResponseDto<Metadata>(
+      GameApiHttpStatus.OK,
+      'success',
+      result,
+    );
+  }
 
-    @Get('metadata/:id')
-    @ApiOperation({ summary: 'get metadata' })
-    async getMetadata(
-        @Param('id') id: string
-    ): Promise<CommonResponseDto<Metadata>> {
-        const result = await this.metadataV1Service.getMetadata(id);
+  @Get('metadata/:id')
+  @ApiOperation({ summary: 'get metadata' })
+  async getMetadata(
+    @Param('id') id: string,
+  ): Promise<CommonResponseDto<Metadata>> {
+    const result = await this.metadataV1Service.getMetadata(id);
 
-        return new CommonResponseDto<Metadata>(
-            GameApiHttpStatus.OK,
-            'success',
-            result
-        )
-    }
+    return new CommonResponseDto<Metadata>(
+      GameApiHttpStatus.OK,
+      'success',
+      result,
+    );
+  }
 }

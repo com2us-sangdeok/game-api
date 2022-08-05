@@ -1,65 +1,82 @@
-import {Inject, Injectable, LoggerService,} from '@nestjs/common';
-import {ConfigService} from '@nestjs/config';
-import {WINSTON_MODULE_NEST_PROVIDER} from 'nest-winston';
-import {MetadataEntity} from "../repository/metadata.entity";
-import {ExtensionDto} from "./dto/metadata-v1.dto";
-import {customUuid} from "../../util/common.util";
-import {Metadata} from "./type/meta-info";
-import {MetadataRepository} from "../repository/metadata.repository";
-import {s3get, s3upload} from "../../util/s3.mock";
+import { Inject, Injectable, LoggerService } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
+import { MetadataEntity } from '../repository/metadata.entity';
+import { ExtensionDto } from './dto/metadata-v1.dto';
+import { customUuid } from '../../util/common.util';
+import { Metadata } from './type/meta-info';
+import { MetadataRepository } from '../repository/metadata.repository';
+import { S3storageUtil } from '../../util/s3storage.util';
+import {
+  GameApiException,
+  GameApiHttpStatus,
+} from '../../exception/request.exception';
+import { AxiosClientUtil } from '../../util/axios-client.util';
 
 @Injectable()
 export class MetadataV1Service {
-    constructor(
-        private configService: ConfigService,
-        private readonly metadataRepository: MetadataRepository,
-        @Inject(WINSTON_MODULE_NEST_PROVIDER)
-        private readonly logger: LoggerService,
-    ) {}
+  constructor(
+    private configService: ConfigService,
+    private readonly metadataRepository: MetadataRepository,
+    @Inject(WINSTON_MODULE_NEST_PROVIDER)
+    private readonly logger: LoggerService,
+    private s3: S3storageUtil,
+    private axiosClientUtil: AxiosClientUtil,
+  ) {}
 
-    async uploadMetadata(extensionDto: ExtensionDto): Promise<Metadata> {
-        const metadataId = `${customUuid()}.json`
+  async uploadMetadata(extensionDto: ExtensionDto): Promise<Metadata> {
+    const metadataId = `${customUuid()}.json`;
 
-        // todo: upload metadata to the public cloud storage
-        const uploadedMetadata = s3upload(customUuid());
+    try {
+      await this.s3.upload(
+        metadataId,
+        Buffer.from(JSON.stringify(extensionDto)),
+      );
 
-        try {
-            const data = await this.metadataRepository.registerMetadata(<MetadataEntity>{
-                fileName: metadataId,
-                // todo: set url
-                uri: uploadedMetadata.Location
-            });
+      const data = await this.metadataRepository.registerMetadata(<
+        MetadataEntity
+      >{
+        fileName: metadataId,
+        uri: this.configService.get('FILE_CDN_URI') + metadataId,
+      });
 
-            const meta: Metadata = {
-                id: data.fileName,
-                url: data.uri
-            }
-            return meta;
-        } catch (e) {
-            // if (error instanceof GameApiException) {
-            // code for failover
-            // }
-            this.logger.error(e);
-            throw e;
-            // throw new GameApiException('', e, GameApiHttpStatus.BAD_REQUEST)
-        }
+      const meta: Metadata = {
+        id: data.fileName,
+        url: data.uri,
+      };
+      return meta;
+    } catch (e) {
+      // if (e instanceof GameApiException) {
+      // code for failover
+      // }
+      this.logger.error(e);
+      throw new GameApiException(
+        e.message,
+        e.stack,
+        GameApiHttpStatus.METADATA_UPLOAD_FAILED,
+      );
     }
+  }
 
-    async getMetadata(id: string): Promise<Metadata> {
-        try {
-            const result = await this.metadataRepository.getMetadata(id);
-            // todo: get metadata from cloud storage
-            //       set extension
-            const metadata = s3get(id)
+  async getMetadata(id: string): Promise<Metadata> {
+    try {
+      const metadataFromDb = await this.metadataRepository.getMetadata(id);
+      const filePath =
+        this.configService.get('FILE_CDN_URI') + metadataFromDb.fileName;
+      const metadataFromS3 = await this.axiosClientUtil.get(filePath);
 
-            return <Metadata><unknown>{
-                id: result.fileName,
-                url: result.uri,
-                extension: metadata
-            }
-        } catch (e) {
-            this.logger.error(e);
-            throw e;
-        }
+      return <Metadata>(<unknown>{
+        id: metadataFromDb.fileName,
+        url: metadataFromDb.uri,
+        extension: metadataFromS3.data,
+      });
+    } catch (e) {
+      this.logger.error(e);
+      throw new GameApiException(
+        e.message,
+        e.stack,
+        GameApiHttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
+  }
 }
