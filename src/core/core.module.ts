@@ -8,9 +8,15 @@ import { BlockchainService } from './blockchain/blockchain.service';
 import { LockService } from './modules/contract/lock.service';
 import { CW20Service } from './modules/contract/cw20.service';
 import { CW721Service } from './modules/contract/cw721.service';
+import {SequenceRepository} from "./repository/sequence.repository";
+import {TypeOrmModule} from "@nestjs/typeorm";
+import {SequenceEntity} from "./repository/sequence.entity";
 
 @Module({
-  imports: [BlockchainModule],
+  imports: [
+    BlockchainModule,
+    TypeOrmModule.forFeature([SequenceEntity]),
+  ],
   controllers: [],
   providers: [
     ...coreProviders,
@@ -20,6 +26,7 @@ import { CW721Service } from './modules/contract/cw721.service';
     LockService,
     CW20Service,
     CW721Service,
+    SequenceRepository,
   ],
   exports: [
     CommonService,

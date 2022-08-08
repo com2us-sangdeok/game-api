@@ -16,13 +16,16 @@ import {ConfigModule, ConfigService} from "@nestjs/config";
 import {AxiosClientUtil} from "../util/axios-client.util";
 import {AssetModule} from "../asset/asset.module";
 import {CW20Service} from "../core/modules/contract/cw20.service";
-import {SequenceEntity} from "./repository/sequence.entity";
 import {GameApiRepository} from "./repository/game-api.repository";
+import {SequenceEntity} from "../core/repository/sequence.entity";
+import {CoreModule} from "../core/core.module";
+import {TransactionEntity} from "./repository/transaction.entity";
+import {NonFungibleTokenEntity} from "./repository/non-fungible-token.entity";
 
 @Module({
     imports: [
         BlockchainModule,
-        TypeOrmModule.forFeature([ConvertPoolEntity, SequenceEntity]),
+        TypeOrmModule.forFeature([ConvertPoolEntity, TransactionEntity, NonFungibleTokenEntity]),
         WinstonModule,
         HttpModule.registerAsync({
             imports: [ConfigModule],
@@ -33,17 +36,18 @@ import {GameApiRepository} from "./repository/game-api.repository";
             inject: [ConfigService],
         }),
         AssetModule,
+        CoreModule,
     ],
     controllers: [GameApiV1Controller],
     providers: [
         ...coreProviders,
-        GameApiV1Service,
         BlockchainService,
-        GrantService,
-        LockService,
-        CommonService,
-        CW20Service,
-        CW721Service,
+        // GrantService,
+        // LockService,
+        // CommonService,
+        // CW20Service,
+        // CW721Service,
+        GameApiV1Service,
         AxiosClientUtil,
         GameApiRepository,
     ],

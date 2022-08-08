@@ -1,15 +1,25 @@
 import { Injectable } from '@nestjs/common';
 import { BlockchainService } from '../blockchain/blockchain.service';
-import { Wallet, Tx, MsgSend } from '@terra-money/terra.js';
+import { MsgSend, Tx, Wallet } from '@terra-money/terra.js';
 import { SignMode } from '@terra-money/terra.proto/cosmos/tx/signing/v1beta1/signing';
 import { Coinbalance } from './modules.inerface';
+import { DataSource, QueryRunner } from 'typeorm';
+import { SequenceRepository } from '../repository/sequence.repository';
+import {
+  GameApiException,
+  GameApiHttpStatus,
+} from '../../exception/request.exception';
 
 @Injectable()
 export class CommonService {
   private bc = this.blockchainService.blockChainClient();
   private lcd = this.blockchainService.lcdClient();
 
-  constructor(private readonly blockchainService: BlockchainService) {}
+  constructor(
+    private readonly blockchainService: BlockchainService,
+    private dataSource: DataSource,
+    private sequenceRepository: SequenceRepository,
+  ) {}
 
   public async sign(wallet: Wallet, tx: Tx): Promise<Tx> {
     const walletInfo = await wallet.accountNumberAndSequence();
@@ -36,5 +46,56 @@ export class CommonService {
     denom: string,
   ): Promise<MsgSend> {
     return new MsgSend(sender, receiver, amount + denom);
+  }
+
+  public async getSequenceNumber(accAddress: string): Promise<any> {
+    const queryRunner: QueryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.startTransaction('SERIALIZABLE');
+    try {
+      const sequenceFromBlockchain: number = (
+        await this.blockchainService
+          .blockChainClient()
+          .client.account(accAddress)
+      ).sequence;
+
+      let sequenceFromDB: number = (
+        await this.sequenceRepository.getSequenceNumber(queryRunner, accAddress)
+      ).sequenceNumber;
+
+      if (sequenceFromDB === -1) {
+        // init sequence number
+        await this.sequenceRepository.registerSequence(
+          queryRunner,
+          accAddress,
+          sequenceFromBlockchain,
+        );
+        sequenceFromDB = sequenceFromBlockchain;
+      } else if (sequenceFromDB < sequenceFromBlockchain) {
+        // sync sequence number between DB and blockchain network
+        await this.sequenceRepository.updateSequenceFromBlockchain(
+          queryRunner,
+          accAddress,
+          sequenceFromBlockchain,
+        );
+        sequenceFromDB = sequenceFromBlockchain;
+      }
+
+      await this.sequenceRepository.updateSequenceFromDb(
+        queryRunner,
+        accAddress,
+        sequenceFromDB,
+      );
+      await queryRunner.commitTransaction();
+      return sequenceFromBlockchain;
+    } catch (e) {
+      await queryRunner.rollbackTransaction();
+      throw new GameApiException(
+          e.message,
+        e.stack,
+        GameApiHttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    } finally {
+      await queryRunner.release();
+    }
   }
 }

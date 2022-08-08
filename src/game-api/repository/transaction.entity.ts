@@ -6,29 +6,32 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
-@Entity('GameApiTransaction')
-export class GameApiTransactionEntity {
-    @PrimaryColumn({ type: 'varchar' })
-    transactionId: string;
+@Entity('Transaction')
+export class TransactionEntity {
+  @PrimaryColumn({ type: 'varchar' })
+  requestId: string;
 
-    @Column({ type: 'varchar' })
-    signTransaction: string;
+  @Column({ type: 'varchar'})
+  txHash: string;
 
-    @Column({ type: 'varchar', default: '' })
-    transactionHash: string;
+  @Column({ type: 'json' })
+  tx: object;
 
-    @Column({ type: 'boolean', default: false })
-    status: boolean;
+  @Column({ type: 'boolean', default: false })
+  status: boolean;
 
-    @Column({ type: 'varchar', default: '' })
-    message: string;
+  @Column({ type: 'varchar'})
+  appId: string;
 
-    @Column({ type: 'numeric', default: 0.0 })
-    executionTime: number;
+  @Column({ type: 'bigint'})
+  playerId: number;
 
-    @CreateDateColumn()
-    createdAt: string;
+  @Column({ type: 'varchar'})
+  accAddress: string;
 
-    @UpdateDateColumn()
-    updatedAt: string;
+  @CreateDateColumn()
+  createdAt: string;
+
+  @UpdateDateColumn()
+  updatedAt: string;
 }

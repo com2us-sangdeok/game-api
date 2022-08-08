@@ -21,7 +21,9 @@ import {AssetModule} from "./asset/asset.module";
 import {MetadataModule} from "./metadata/metadata.module";
 import {MetadataEntity} from "./metadata/repository/metadata.entity";
 import {ConvertPoolEntity} from "./game-api/repository/convert-pool.entity";
-import {SequenceEntity} from "./game-api/repository/sequence.entity";
+import {SequenceEntity} from "./core/repository/sequence.entity";
+import {TransactionEntity} from "./game-api/repository/transaction.entity";
+import {NonFungibleTokenEntity} from "./game-api/repository/non-fungible-token.entity";
 
 @Module({
     imports: [
@@ -46,7 +48,7 @@ import {SequenceEntity} from "./game-api/repository/sequence.entity";
                   username: configService.get('DB_USERNAME'),
                   password: configService.get('DB_PASSWORD'),
                   database: configService.get('DB_DATABASE'),
-                  entities: [ConvertPoolEntity, AssetEntity, MetadataEntity, SequenceEntity],
+                  entities: [ConvertPoolEntity, AssetEntity, MetadataEntity, SequenceEntity, TransactionEntity, NonFungibleTokenEntity],
                   synchronize: configService.get('DB_SYNCHRONIZE') === 'true',
                   logging: true,
                   logger: new DatabaseLogger(process.env.NODE_ENV),

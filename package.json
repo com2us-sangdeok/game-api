@@ -96,7 +96,7 @@
   "pkg": {
     "scripts": "dist/main.js",
     "targets": [
-      "node16-linux"
+      "node16-macos-arm64"
     ],
     "asset": "*.css"
   },
