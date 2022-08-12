@@ -1,5 +1,5 @@
 import { Injectable, Inject } from '@nestjs/common';
-import { BlockchainService } from '../../core/blockchain/blockchain.service';
+import { BlockchainService } from '../../bc-core/blockchain/blockchain.service';
 
 @Injectable()
 export class GameApiV2Service {

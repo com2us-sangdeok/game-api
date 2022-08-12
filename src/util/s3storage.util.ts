@@ -4,15 +4,13 @@ import {
   GameApiException,
   GameApiHttpStatus,
 } from '../exception/request.exception';
-import {Injectable} from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 
 @Injectable()
 export class S3storageUtil {
   private S3: AWS.S3;
 
-  constructor(
-      private configService: ConfigService,
-  ) {
+  constructor(private configService: ConfigService) {
     this.S3 = new AWS.S3({
       accessKeyId: this.configService.get('AWS_S3_ACCESS_KEY'),
       secretAccessKey: this.configService.get('AWS_S3_KEY_SECRET'),
@@ -34,9 +32,13 @@ export class S3storageUtil {
       const result = await this.S3.upload(uploadParams).promise();
       return result.Location;
     } catch (e) {
-      console.log('--------------------------------------------------------------------')
-      console.log(e)
-      console.log('--------------------------------------------------------------------')
+      console.log(
+        '--------------------------------------------------------------------',
+      );
+      console.log(e);
+      console.log(
+        '--------------------------------------------------------------------',
+      );
       throw new GameApiException(
         e.message,
         e.stack,

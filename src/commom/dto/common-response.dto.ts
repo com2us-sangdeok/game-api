@@ -1,19 +1,19 @@
-import {ApiResponseProperty} from "@nestjs/swagger";
+import { ApiResponseProperty } from '@nestjs/swagger';
 
 export class CommonResponseDto<T> {
-    constructor(code: number, message?: string, data?: T) {
-        this.code = code;
-        this.message = message;
-        this.data = data;
-    }
+  constructor(code: number, message?: string, data?: T) {
+    this.code = code;
+    this.message = message;
+    this.data = data;
+  }
 
-    @ApiResponseProperty()
-    code: number;
+  @ApiResponseProperty()
+  code: number;
 
-    @ApiResponseProperty()
-    message?: string;
+  @ApiResponseProperty()
+  message?: string;
 
-    @ApiResponseProperty()
-    data?: T;
+  @ApiResponseProperty()
+  data?: T;
 }
 

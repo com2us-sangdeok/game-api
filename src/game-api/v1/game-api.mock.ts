@@ -6,8 +6,10 @@ export const betagameInfoApi = (appId: string) => {
     message: 'success',
     data: {
       gameId: appId,
-      constraintUrl: 'https://game.com2us.com/constraint-url/' + appId,
-      updateItemUrl: 'https://game.com2us.com/update-item-url/' + appId,
+      constraintUrlForMint: 'https://game.com2us.com/constraint-url/' + appId,
+      updateItemUrlForMint: 'https://game.com2us.com/update-item-url/' + appId,
+      itemsForMint: 'https://game.com2us.com/items-url/' + appId,
+      mintType: 'item', // {item, items, character}
       singleMintFee: {
         ctx: 20,
         gameToken: 10,
@@ -16,7 +18,7 @@ export const betagameInfoApi = (appId: string) => {
         ctx: 20,
         gameToken: 10,
       },
-      lockCa: 'terra1x46rqay4d3cssq8gxxvqz8xt6nwlz4td20k38v',
+      lockCa: 'terra1wgh6adn8geywx0v78zs9azrqtqdegufuegnwep',
       c2xCa: '',
       gameProviderAddress: '',
       treasuryAddress: '',
@@ -24,7 +26,7 @@ export const betagameInfoApi = (appId: string) => {
       c2xHolderAddress: '',
       gameTokenCa: '',
       fanHolderAddress: '',
-      nftCa: 'nftCa' + appId,
+      nftCa: 'terra1sshdl5qajv0q0k6shlk8m9sd4lplpn6gggfr86',
     },
   };
 };
@@ -45,7 +47,7 @@ export const getMinterKey = async (): Promise<Key> => {
   return hsmMinterKey;
 };
 
-export const updateGameServerForMintingApi = (reqest: any) => {
+export const updateGameServerForMintingApi = (data: any) => {
   return {
     code: 200,
     message: 'success',
@@ -55,22 +57,45 @@ export const updateGameServerForMintingApi = (reqest: any) => {
   };
 };
 
+export const validateItemFromGameServer = (data: any) => {
+  return {
+    code: 200,
+    message: 'success',
+    data: {
+      itemId: 'test01',
+      metadata: {
+        name: "Arbiter's Robe",
+        description: 'desc',
+        image: 'https://image01.c2x.world/equip_92053030.gif',
+        animation_url: 'https://image01.c2x.world/equip_92053030.gif',
+        youtube_url: '',
+        image_data: '',
+        external_url: 'https://dex.c2xnft.com/market?key=4423',
+        background_color: '',
+        attributes: [
+          {
+            trait_type: 'Category',
+            max_value: '',
+            value: 'Game',
+            display_type: '',
+          },
+        ],
+      },
+    },
+  };
+};
+
 export const gameItemsForMint = (data: any) => {
   return {
     name: "Arbiter's Robe",
-    description: "desc",
-    image: "https://image01.c2x.world/equip_92053030.gif",
-    animation_url: "https://image01.c2x.world/equip_92053030.gif",
-    youtube_url: "",
-    image_data: "",
-    external_url: "https://dex.c2xnft.com/market?key=4423",
-    background_color: "",
+    description: 'desc',
+    image: 'https://image01.c2x.world/equip_92053030.gif',
     attributes: [
       {
-        trait_type: "Category",
-        value: "Game",
-      }
+        trait_type: 'Category',
+        value: 'Game',
+      },
     ],
-    feeCount: 4
-  }
-}
+    feeCount: 4,
+  };
+};

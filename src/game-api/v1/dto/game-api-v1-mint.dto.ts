@@ -11,7 +11,7 @@ import {
   IsOptional,
   IsString,
 } from 'class-validator';
-import { ExtensionDto } from '../../../metadata/v1/dto/metadata-v1.dto';
+import { ExtensionDto } from '../../../metadata-api/v1/dto/metadata-v1.dto';
 
 export class GameApiV1ConvertPoolDto {
   @ApiProperty({ example: 'afkraid', description: 'game app name' })
@@ -32,12 +32,12 @@ export class GameApiV1ConvertPoolDto {
 }
 
 export class GameApiV1ImageUrlAndMintingFeeCodeDto {
-  @ApiProperty({
-    example: 'https://image01.c2x.world/equip_96022030.gif',
-    description: 'Image URL',
-  })
-  @IsString()
-  imageUrl: string;
+  // @ApiProperty({
+  //   example: 'https://image01.c2x.world/equip_96022030.gif',
+  //   description: 'Image URL',
+  // })
+  // @IsString()
+  // imageUrl: string;
 
   @ApiProperty({ example: '1', description: 'Minting fee code' })
   @IsString()
@@ -59,7 +59,11 @@ export class GameApiV1MintingTokenDto extends GameApiV1ImageUrlAndMintingFeeCode
   tokenId: string;
 }
 
-export class GameApiV1MintDto {
+export class GameApiV1ValidItemDto {
+  @ApiProperty({ example: 1234, description: 'Game index' })
+  @IsNumber()
+  gameIndex: number;
+
   @ApiProperty({ example: 'asia_app', description: 'App ID' })
   @IsString()
   appId: string;
@@ -74,7 +78,7 @@ export class GameApiV1MintDto {
   channelId: string;
 
   @ApiProperty({ example: 13453245, description: 'Player ID' })
-  @IsString()
+  @IsNumber()
   playerId: number;
 
   @ApiProperty({
@@ -106,12 +110,62 @@ export class GameApiV1MintDto {
   @IsOptional()
   @IsArray()
   tokens: GameApiV1MintingTokenDto[];
-
-  @ApiProperty({ type: [ExtensionDto], description: 'metadata for minting' })
-  metadata: ExtensionDto;
 }
 
+export class GameApiV1MintDto extends GameApiV1ValidItemDto {
+  @ApiProperty({
+    example: 'GAME-API-9fb4b2f7-850b-449d-bda1-fa4c2b81af79',
+    description: 'request id for mint',
+  })
+  @IsString()
+  requestId: string;
 
-export class GameApiV1ResponseMintItemDto extends ExtensionDto {
-  feeCount: number
+  @ApiProperty({
+    example: 'test01',
+    description: 'valid item/character id for minting',
+  })
+  @IsString()
+  goodsId: string;
+
+  @ApiProperty({ example: 10, description: 'c2x fee' })
+  @IsNumber()
+  ctxFee: number;
+
+  @ApiProperty({ example: 5, description: 'game token fee' })
+  @IsNumber()
+  tokenFee: number;
+
+  @ApiProperty({ type: ExtensionDto, description: 'metadata-api for minting' })
+  metadata?: ExtensionDto;
+}
+
+export class GameApiV1CalculateMintingFeeDto {
+  c2xFee: number;
+  tokenFee: number;
+}
+
+export class GameApiV1ResponseValidItemDto extends GameApiV1CalculateMintingFeeDto {
+  metadata: ExtensionDto;
+  requestId: string;
+  goodsId: string;
+}
+
+export class GameApiV1ResponseMintDto {
+  tokenId: string;
+  unsignedTx: string;
+  payerAddress: string;
+  tokenUri: string;
+}
+
+export class GameApiV1MintItemDto {
+  gameIndex: number;
+  appId: string;
+  playerId: string;
+  categoryCode: string;
+}
+
+export class GameApiV1ResponseMintItemDto {
+  itemId: string;
+  itemUrl: string;
+  feeCount: number;
 }
