@@ -10,23 +10,7 @@ import {HttpExceptionFilter} from "./filter/http-exception.filter";
 // import {winstonLogger} from "./logger/logger.module";
 /*
   todo:
-    + Config
-    + DB Connection
-    + Blockchain Connection
-    + Versioning
-    + Swagger
-    + Logger // log rotate
     Security (auth)
-    Exception / Error
-    File
-    Filter
-    Transform pipe
-    validation pipe / class validation
-    http client
-    distributed tracing (OpenTracing, Jaeger)
-    rate limiting (@nestjs/throttler )
-    + Request context
-    gRPC
  */
 async function bootstrap() {
     const appOptions = {

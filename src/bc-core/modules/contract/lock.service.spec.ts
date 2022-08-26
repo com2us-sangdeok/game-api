@@ -1,14 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import {
-  Fee,
-  LCDClient,
-  MnemonicKey,
-  MsgSend,
-  Wallet,
-  Coins,
-} from '@terra-money/terra.js';
-import { Msg, Tx } from '@terra-money/terra.js/dist/core';
-import { Pagination } from '@terra-money/terra.js/dist/client/lcd/APIRequester';
+import { LCDClient, MnemonicKey, Tx } from '@xpla/xpla.js';
 import { BlockchainClient } from '@blockchain/chain-bridge';
 import { GrantService } from '../grant.service';
 import { LockService } from './lock.service';
@@ -47,9 +38,9 @@ describe('LockService', () => {
   let bc: BlockchainClient;
   const tokenId = '1';
   beforeEach(async () => {
-    process.env.BC_TYPE = 'terra';
-    process.env.BC_NODE_URL = 'http://34.146.148.127:1317';
-    process.env.BC_CHAIN_ID = 'localterra';
+    process.env.BC_TYPE = 'xpla';
+    process.env.BC_NODE_URL = 'https://cube-lcd.xpla.dev';
+    process.env.BC_CHAIN_ID = 'cube_47-4';
 
     const app: TestingModule = await Test.createTestingModule({
       imports: [BlockchainModule],

@@ -1,12 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { BlockchainService } from '../../blockchain/blockchain.service';
-import { MnemonicKey, MsgExecuteContract } from '@terra-money/terra.js';
-import { Tx } from '@terra-money/terra.js/dist/core';
+import { MnemonicKey, MsgExecuteContract } from '@xpla/xpla.js';
+import { Tx } from '@xpla/xpla.js/dist/core';
 import { CommonService } from '../common.service';
 import { CW721Service } from './cw721.service';
 import { type } from 'os';
+import {
+  BlockchainException,
+  BlockchainStatus,
+} from '../../../exception/blockchain.exception';
 
 // nft lock, unlock tx 생성
+//TODO LOCK CONTRACT 필요
 @Injectable()
 export class LockService {
   private bc = this.blockchainService.blockChainClient();
@@ -59,7 +64,11 @@ export class LockService {
         tokenUri64,
       );
     } catch (err) {
-      console.log(err);
+      throw new BlockchainException(
+        err.message,
+        err?.code,
+        BlockchainStatus.NFT_LOCK_ERROR,
+      );
     }
   }
 
@@ -80,7 +89,11 @@ export class LockService {
         ...executeMsg,
       });
     } catch (err) {
-      console.log(err);
+      throw new BlockchainException(
+        err.message,
+        err?.code,
+        BlockchainStatus.NFT_UNLOCK_ERROR,
+      );
     }
   }
 
@@ -92,7 +105,11 @@ export class LockService {
 
       return await this.commonService.sign(ownerWallet, tx);
     } catch (err) {
-      console.log(err);
+      throw new BlockchainException(
+        err.message,
+        err?.code,
+        BlockchainStatus.NFT_INLOCK_SIGN_ERROR,
+      );
     }
   }
 
@@ -105,7 +122,11 @@ export class LockService {
         tokens: { owner: ownerAddress },
       });
     } catch (err) {
-      console.log(err);
+      throw new BlockchainException(
+        err.message,
+        err?.code,
+        BlockchainStatus.NFT_LOCK_LIST_ERROR,
+      );
     }
   }
 }

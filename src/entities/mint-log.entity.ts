@@ -3,7 +3,8 @@ import {
   CreateDateColumn,
   Entity,
   PrimaryColumn,
-  UpdateDateColumn,
+  Table,
+  TableIndex,
 } from 'typeorm';
 import { MintType, MintLogStatus } from '../enum';
 
@@ -19,6 +20,9 @@ export class MintLogEntity {
   playerId: number;
 
   @Column({ type: 'varchar' })
+  server: string;
+
+  @Column({ type: 'varchar' })
   accAddress: string;
 
   @Column({ type: 'varchar' })
@@ -28,10 +32,10 @@ export class MintLogEntity {
   goodsId: string;
 
   @Column({ type: 'bigint' })
-  ctxFee: number;
+  serviceFee: number;
 
   @Column({ type: 'bigint' })
-  tokenFee: number;
+  gameFee: number;
 
   @Column({ type: 'enum', enum: MintLogStatus, default: MintLogStatus.READY })
   status: MintLogStatus;
@@ -39,3 +43,88 @@ export class MintLogEntity {
   @CreateDateColumn()
   createdAt: string;
 }
+
+export const DB_TABLE_MINT_LOG = new Table({
+  name: 'afk_mint_log',
+  columns: [
+    {
+      name: 'request_id',
+      type: 'varchar',
+      isPrimary: true,
+      length: '100',
+      // isGenerated: true, // Auto-increment
+      // generationStrategy: 'increment',
+    },
+    {
+      name: 'mint_type',
+      type: 'enum',
+      enum: [MintType.ITEM, MintType.ITEMS, MintType.CHARACTER],
+      enumName: 'mint_typs_enum',
+      default: `'${MintType.ITEM}'`,
+    },
+    {
+      name: 'player_id',
+      type: 'bigint',
+      isNullable: false,
+    },
+    {
+      name: 'server',
+      type: 'varchar',
+      isNullable: false,
+    },
+    {
+      name: 'acc_address',
+      type: 'varchar',
+      length: '100',
+      isNullable: false,
+    },
+    {
+      name: 'app_id',
+      type: 'varchar',
+      length: '100',
+      isNullable: false,
+    },
+    {
+      name: 'goods_id',
+      type: 'varchar',
+      length: '100',
+      isNullable: false,
+    },
+    {
+      name: 'tx_fee',
+      type: 'bigint',
+      isNullable: false,
+    },
+    {
+      name: 'service_fee',
+      type: 'bigint',
+      isNullable: false,
+    },
+    {
+      name: 'created_at',
+      type: 'timestamp',
+      isNullable: false,
+      default: 'now()',
+    },
+    {
+      name: 'status',
+      type: 'enum',
+      enum: [MintType.ITEM, MintType.ITEMS, MintType.CHARACTER],
+      enumName: 'mint_typs_enum',
+      default: `'${MintType.ITEM}'`,
+    },
+    {
+      name: 'updated_at',
+      type: 'timestamp',
+      isNullable: false,
+      default: 'now()',
+    },
+  ],
+});
+
+export const DB_INDEX_MINT_LOG = [
+  // new TableIndex({
+  //   name: 'idx_ml_player_id',
+  //   columnNames: ['player_id'],
+  // }),
+];

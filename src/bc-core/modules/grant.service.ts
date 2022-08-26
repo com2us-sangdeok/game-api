@@ -1,8 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { Msg, Tx } from '@terra-money/terra.js/dist/core';
+import { Msg, Tx, Fee } from '@xpla/xpla.js/dist/core';
 import { BlockchainService } from '../blockchain/blockchain.service';
 import { CommonService } from './common.service';
-import { Fee } from '@terra-money/terra.js';
 
 // tx 생성 수수료 대납
 @Injectable()

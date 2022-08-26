@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { BlockchainService } from '../../blockchain/blockchain.service';
-import { Wallet, Tx, MsgExecuteContract } from '@terra-money/terra.js';
+import { Wallet, Tx, MsgExecuteContract } from '@xpla/xpla.js';
 import { NftDetail } from '../modules.inerface';
+import {
+  BlockchainException,
+  BlockchainStatus,
+} from '../../../exception/blockchain.exception';
 
 @Injectable()
 export class CW721Service {
@@ -37,7 +41,11 @@ export class CW721Service {
         {},
       );
     } catch (err) {
-      console.log(err);
+      throw new BlockchainException(
+        err.message,
+        err?.code,
+        BlockchainStatus.NFT_MINT_ERROR,
+      );
     }
   }
 
@@ -54,7 +62,11 @@ export class CW721Service {
         tokens: { owner: address },
       });
     } catch (err) {
-      console.log(err);
+      throw new BlockchainException(
+        err.message,
+        err?.code,
+        BlockchainStatus.GET_NFT_LIST_ERROR,
+      );
     }
   }
 
@@ -68,7 +80,11 @@ export class CW721Service {
         nft_info: { token_id: tokenId },
       });
     } catch (err) {
-      console.log(err);
+      throw new BlockchainException(
+        err.message,
+        err?.code,
+        BlockchainStatus.GET_NFT_DETAIL_ERROR,
+      );
     }
   }
 
@@ -89,7 +105,11 @@ export class CW721Service {
 
       return new MsgExecuteContract(sender, nftContract, { ...executeMsg }, {});
     } catch (err) {
-      console.log(err);
+      throw new BlockchainException(
+        err.message,
+        err?.code,
+        BlockchainStatus.NFT_TRANSFER_ERROR,
+      );
     }
   }
 
@@ -113,7 +133,11 @@ export class CW721Service {
 
       return new MsgExecuteContract(sender, nftContract, { ...executeMsg }, {});
     } catch (err) {
-      console.log(err);
+      throw new BlockchainException(
+        err.message,
+        err?.code,
+        BlockchainStatus.NFT_SEND_ERROR,
+      );
     }
   }
 }

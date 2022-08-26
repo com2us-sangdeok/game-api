@@ -65,6 +65,7 @@ import {
             MintLogEntity,
             TransactionEntity,
           ],
+          // synchronize: true,
           synchronize: configService.get('DB_SYNCHRONIZE') === 'true',
           logging: true,
           logger: new DatabaseLogger(process.env.NODE_ENV),

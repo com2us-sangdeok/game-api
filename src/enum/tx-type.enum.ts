@@ -1,8 +1,9 @@
 //transaction.dao
 export enum TxType {
-  MINT = 1,
-  BURN,
-  LOCK,
-  UNLOCK,
-  CONVERT,
+  MINT = 'mint',
+  BURN = 'burn',
+  LOCK = 'lock',
+  UNLOCK = 'unlock',
+  CONVERTTOCURRENCY = 'convertToCurrency',
+  CONVERTTOTOKEN = 'convertToToken',
 }

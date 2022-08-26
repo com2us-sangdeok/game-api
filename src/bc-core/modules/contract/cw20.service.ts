@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { BlockchainService } from '../../blockchain/blockchain.service';
-import { MsgExecuteContract } from '@terra-money/terra.js';
+import { MsgExecuteContract } from '@xpla/xpla.js';
 import { TokenBalance } from '../modules.inerface';
+import {
+  BlockchainException,
+  BlockchainStatus,
+} from '../../../exception/blockchain.exception';
 
 @Injectable()
 export class CW20Service {
@@ -28,7 +32,11 @@ export class CW20Service {
         tokenSymbol: contractInfo.symbol,
       };
     } catch (err) {
-      console.log(err);
+      throw new BlockchainException(
+        err.message,
+        err?.code,
+        BlockchainStatus.GET_TOKEN_BALANCE_ERROR,
+      );
     }
   }
 
@@ -54,7 +62,11 @@ export class CW20Service {
         {},
       );
     } catch (err) {
-      console.log(err);
+      throw new BlockchainException(
+        err.message,
+        err?.code,
+        BlockchainStatus.TRANSFER_TOKEN_ERROR,
+      );
     }
   }
 }

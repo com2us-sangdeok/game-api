@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { LCDClient, MnemonicKey, Wallet } from '@terra-money/terra.js';
+import { LCDClient, MnemonicKey, Wallet } from '@xpla/xpla.js';
 import { BlockchainClient } from '@blockchain/chain-bridge';
 import { BlockchainService } from '../../blockchain/blockchain.service';
 import { coreProviders } from '../../core.provider';
@@ -9,15 +9,15 @@ import { CommonService } from '../common.service';
 
 describe('cw20 token', () => {
   const sender = {
-    address: 'terra1x46rqay4d3cssq8gxxvqz8xt6nwlz4td20k38v',
+    address: 'xpla16v6y48xllwy7amcmvhkv0a3zp7jepl44yvhvxt',
     mnemonic:
-      'notice oak worry limit wrap speak medal online prefer cluster roof addict wrist behave treat actual wasp year salad speed social layer crew genius',
+      'predict junior nation volcano boat melt glance climb target rubber lyrics rain fall globe face catch plastic receive antique picnic domain head hat glue',
   };
 
   const receiver = {
-    address: 'terra1dpau8af8qu3cpturacqu26uwnn2wagfqgu3c4p',
+    address: 'xpla1xvh9tt6gsrn0yem2fv6xjfrfyefal42ezzxhca',
     mnemonic:
-      'course patient raw vapor evoke survey together math decorate mango use fence abuse column coach tree fine wedding mixture educate acquire inject script milk',
+      'notice oak worry limit wrap speak medal online prefer cluster roof addict wrist behave treat actual wasp year salad speed social layer crew genius',
   };
 
   let walletService: BlockchainService;
@@ -26,9 +26,9 @@ describe('cw20 token', () => {
   let lcd: LCDClient;
   let bc: BlockchainClient;
   beforeEach(async () => {
-    process.env.BC_TYPE = 'terra';
-    process.env.BC_NODE_URL = 'http://34.146.148.127:1317';
-    process.env.BC_CHAIN_ID = 'localterra';
+    process.env.BC_TYPE = 'xpla';
+    process.env.BC_NODE_URL = 'https://cube-lcd.xpla.dev';
+    process.env.BC_CHAIN_ID = 'cube_47-4';
 
     const app: TestingModule = await Test.createTestingModule({
       imports: [BlockchainModule],
@@ -49,7 +49,8 @@ describe('cw20 token', () => {
     bc = walletService.blockChainClient();
   });
 
-  const cw20Contract = 'terra18vd8fpwxzck93qlwghaj6arh4p7c5n896xzem5';
+  const cw20Contract =
+    'xpla1pg4dxed60q3w5a6dy8ca84q7wa7d9qm0amxw5j7zmwcpvgefg6xshvdmh6';
 
   describe('cw20 contract', () => {
     it('get token balance', async () => {

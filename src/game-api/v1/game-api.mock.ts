@@ -1,4 +1,4 @@
-import { Key } from '@terra-money/terra.js';
+import { Key } from '@xpla/xpla.js';
 
 export const betagameInfoApi = (appId: string) => {
   return {

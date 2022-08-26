@@ -16,4 +16,3 @@ export class CommonResponseDto<T> {
   @ApiResponseProperty()
   data?: T;
 }
-

@@ -69,7 +69,7 @@ export class MetadataV1Service {
       return <Metadata>(<unknown>{
         id: metadataFromDb.fileName,
         url: metadataFromDb.uri,
-        extension: metadataFromS3.data,
+        extension: metadataFromS3.body,
       });
     } catch (e) {
       this.logger.error(e);
