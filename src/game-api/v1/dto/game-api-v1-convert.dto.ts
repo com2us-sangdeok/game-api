@@ -1,30 +1,34 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsNumber, IsString, IsArray } from 'class-validator';
 
 class ConvertCommonDto {
-  @ApiProperty({ example: 1234, description: 'Game index' })
-  @IsNumber()
-  gameIndex: number;
+  // @ApiProperty({ example: 1, description: 'Game index' })
+  // @IsNumber()
+  // gameIndex: number;
 
-  @ApiProperty({ example: 'app_id', description: 'App ID' })
+  @ApiProperty({
+    example: 'com.com2us.c2xwallet.global.normal',
+    description: 'App ID',
+  })
   @IsString()
   appId: string;
 
   @ApiProperty({
-    example: 'asia_server',
-    description: 'Server ID',
+    example: ['1', '1'],
+    description:
+      'Server ID && Channel Id && sub Channel ID ... channel is infinite',
     required: false,
   })
-  @IsString()
-  serverId?: string;
+  @IsArray()
+  serverId?: string[];
 
   @ApiProperty({
-    example: 'asia_channel',
-    description: 'Channel ID',
+    example: 'character Id',
+    description: 'Is not only one character in server & channel',
     required: false,
   })
   @IsString()
-  channelId?: string;
+  characterId?: string;
 
   @ApiProperty({ example: '13453245', description: 'Player ID' })
   @IsString()
@@ -42,13 +46,6 @@ export class V1ConvertCurrencyInfoInputDto extends ConvertCommonDto {
   })
   @IsString()
   accAddress: string;
-
-  @ApiProperty({
-    example: 'xpla1pg4dxed60q3w5a6dy8ca84q7wa7d9qm0amxw5j7zmwcpvgefg6xshvdmh6',
-    description: 'Game Token Contract Address',
-  })
-  @IsString()
-  tokenContract: string;
 }
 
 export class V1ConvertToCurrencyInputDto extends ConvertCommonDto {
@@ -58,14 +55,6 @@ export class V1ConvertToCurrencyInputDto extends ConvertCommonDto {
   })
   @IsString()
   accAddress: string;
-
-  @ApiProperty({
-    example: 'xpla1pg4dxed60q3w5a6dy8ca84q7wa7d9qm0amxw5j7zmwcpvgefg6xshvdmh6',
-    description: 'Game Token Contract Address',
-    required: false,
-  })
-  @IsString()
-  tokenContract?: string;
 
   @ApiProperty({
     example: '1001000801',
@@ -89,14 +78,6 @@ export class V1ConvertToTokenInputDto extends ConvertCommonDto {
   })
   @IsString()
   accAddress: string;
-
-  @ApiProperty({
-    example: 'xpla1pg4dxed60q3w5a6dy8ca84q7wa7d9qm0amxw5j7zmwcpvgefg6xshvdmh6',
-    description: 'Game Token Contract Address',
-    required: false,
-  })
-  @IsString()
-  tokenContract?: string;
 
   @ApiProperty({
     example: '1001000801',
@@ -220,6 +201,22 @@ class V1ConvertCurrencyInfo {
 }
 
 export class V1ConvertCurrencyInfoOutputDto extends ConvertCommonDto {
+  @ApiProperty({
+    example: 'xpla1nlnang3a8wwgwx0sm4zut9ygx8mrvdes5n9m3g',
+    description: 'game provider address',
+  })
+  @IsString()
+  providerAddress: string;
+
+  @ApiProperty({
+    example: 'xpla1pg4dxed60q3w5a6dy8ca84q7wa7d9qm0amxw5j7zmwcpvgefg6xshvdmh6',
+    description: 'Game Token Contract Address',
+  })
+  @IsString()
+  tokenContract: string;
+
+  apiList?: { apiTypeCd: string; apiUrl: string }[];
+
   @ApiProperty({ description: 'currency info', type: [V1ConvertCurrencyInfo] })
   currency: V1ConvertCurrencyInfo[];
 }

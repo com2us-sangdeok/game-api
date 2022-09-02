@@ -8,7 +8,7 @@ import {
 } from 'typeorm';
 import { MintType, MintLogStatus } from '../enum';
 
-@Entity('MintLog')
+@Entity('tb_mint_log')
 export class MintLogEntity {
   @PrimaryColumn({ type: 'varchar' })
   requestId: string;
@@ -29,13 +29,13 @@ export class MintLogEntity {
   appId: string;
 
   @Column({ type: 'varchar' })
-  goodsId: string;
+  id: string;
 
-  @Column({ type: 'bigint' })
-  serviceFee: number;
+  @Column({ type: 'varchar' })
+  serviceFee: string;
 
-  @Column({ type: 'bigint' })
-  gameFee: number;
+  @Column({ type: 'varchar' })
+  gameFee: string;
 
   @Column({ type: 'enum', enum: MintLogStatus, default: MintLogStatus.READY })
   status: MintLogStatus;
@@ -109,9 +109,9 @@ export const DB_TABLE_MINT_LOG = new Table({
     {
       name: 'status',
       type: 'enum',
-      enum: [MintType.ITEM, MintType.ITEMS, MintType.CHARACTER],
+      enum: [MintLogStatus.READY, MintLogStatus.FAILURE, MintLogStatus.COMPLETE],
       enumName: 'mint_typs_enum',
-      default: `'${MintType.ITEM}'`,
+      default: `'${MintLogStatus.READY}'`,
     },
     {
       name: 'updated_at',

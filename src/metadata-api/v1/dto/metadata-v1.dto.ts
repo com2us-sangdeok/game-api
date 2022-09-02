@@ -31,7 +31,7 @@ export class ExtensionDto {
   @IsString()
   name: string;
 
-  @ApiProperty({ example: 'desc', description: 'desc', required: false })
+  @ApiProperty({ example: 'desc', description: 'description for nft', required: false })
   @IsOptional()
   @IsString()
   description?: string;

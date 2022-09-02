@@ -14,7 +14,7 @@ export class SequenceRepository {
     queryRunner: QueryRunner,
     address: string,
   ): Promise<SequenceEntity> {
-    let nonceProviderEntity = await queryRunner.manager
+    let sequenceProviderEntity = await queryRunner.manager
       .getRepository(SequenceEntity)
       .createQueryBuilder('sequenceEntity')
       .useTransaction(true)
@@ -22,13 +22,13 @@ export class SequenceRepository {
       .setLock('pessimistic_write')
       .where('accAddress = :accAddress', { accAddress: address })
       .getOne();
-    if (nonceProviderEntity === undefined || nonceProviderEntity === null) {
-      nonceProviderEntity = <SequenceEntity>{
+    if (sequenceProviderEntity === undefined || sequenceProviderEntity === null) {
+      sequenceProviderEntity = <SequenceEntity>{
         accAddress: address,
         sequenceNumber: -1,
       };
     }
-    return nonceProviderEntity;
+    return sequenceProviderEntity;
   }
 
   public async registerSequence(
@@ -48,6 +48,7 @@ export class SequenceRepository {
       .execute();
   }
 
+  //blockchain sync
   public async updateSequenceFromBlockchain(
     queryRunner: QueryRunner,
     address: string,

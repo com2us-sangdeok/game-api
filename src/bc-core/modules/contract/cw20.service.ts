@@ -34,7 +34,7 @@ export class CW20Service {
     } catch (err) {
       throw new BlockchainException(
         err.message,
-        err?.code,
+        err.response?.data,
         BlockchainStatus.GET_TOKEN_BALANCE_ERROR,
       );
     }
@@ -64,7 +64,7 @@ export class CW20Service {
     } catch (err) {
       throw new BlockchainException(
         err.message,
-        err?.code,
+        err.response?.data,
         BlockchainStatus.TRANSFER_TOKEN_ERROR,
       );
     }

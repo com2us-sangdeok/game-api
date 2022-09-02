@@ -1,4 +1,4 @@
-//common
+//broadcast
 export interface Coinbalance {
   denom: string;
   amount: string;

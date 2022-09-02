@@ -1,44 +1,86 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, QueryRunner, Repository } from 'typeorm';
 import {
-  NonFungibleTokenEntity,
-  TransactionEntity,
+  TokenIdEntity,
   MintLogEntity,
 } from '../../../entities';
+import {
+  GameApiException,
+  GameApiHttpStatus,
+} from '../../../exception/request.exception';
 
 @Injectable()
 export class MintRepository {
   constructor(
-    @InjectRepository(NonFungibleTokenEntity)
-    private readonly nftRepo: Repository<NonFungibleTokenEntity>,
-    @InjectRepository(TransactionEntity)
-    private readonly txRepo: Repository<TransactionEntity>,
+    @InjectRepository(TokenIdEntity)
+    private readonly nftRepo: Repository<TokenIdEntity>,
     @InjectRepository(MintLogEntity)
     private readonly mintLogRepo: Repository<MintLogEntity>,
+    private dataSource: DataSource,
   ) {}
 
-  public async getNftId(nftEntity: NonFungibleTokenEntity): Promise<number> {
-    // const existedToken = this.nftRepo.findOneBy({appName: nftEntity.appName})
-    // if (existedToken === undefined || existedToken === null) {
-    // }
-    const token = await this.nftRepo
-      .createQueryBuilder()
-      .insert()
-      .into(NonFungibleTokenEntity)
-      .values([
-        {
-          gameIndex: nftEntity.gameIndex,
-          accAddress: nftEntity.accAddress,
-          playerId: nftEntity.playerId,
-        },
-      ])
-      .execute();
-    return token.raw.insertId;
-  }
+  public async getNftId(entity: TokenIdEntity): Promise<number> {
+    const queryRunner: QueryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.startTransaction('SERIALIZABLE');
+    let nextSequenceNumber = 0;
+    try {
+      let sequenceProviderEntity = await queryRunner.manager
+        .getRepository(TokenIdEntity)
+        .createQueryBuilder('tokenIdEntity')
+        .useTransaction(true)
+        .setLock('pessimistic_read')
+        .setLock('pessimistic_write')
+        .where('nftAddress = :nftAddress', { nftAddress: entity.nftAddress })
+        .getOne();
 
-  public async getTxByRequestId(requestId: string): Promise<TransactionEntity> {
-    return await this.txRepo.findOneBy({ requestId: requestId });
+      if (
+        sequenceProviderEntity === undefined ||
+        sequenceProviderEntity === null
+      ) {
+        await queryRunner.manager
+          .getRepository(TokenIdEntity)
+          .createQueryBuilder('tokenIdEntity')
+          .useTransaction(true)
+          .setLock('pessimistic_read')
+          .setLock('pessimistic_write')
+          .insert()
+          .into(TokenIdEntity)
+          .values([
+            {
+              nftAddress: entity.nftAddress,
+              appId: entity.appId,
+              sequenceNumber: 1,
+            },
+          ])
+          .execute();
+        nextSequenceNumber = 1;
+      } else {
+        await queryRunner.manager
+          .getRepository(TokenIdEntity)
+          .createQueryBuilder('tokenIdEntity')
+          .useTransaction(true)
+          .setLock('pessimistic_read')
+          .setLock('pessimistic_write')
+          .update(TokenIdEntity)
+          .set({ sequenceNumber: () => '`sequenceNumber`+1' })
+          .where('nftAddress = :nftAddress', { nftAddress: entity.nftAddress })
+          .execute();
+        const currentSequence = sequenceProviderEntity.sequenceNumber ?? 0;
+        nextSequenceNumber = Number(currentSequence) + 1;
+      }
+      await queryRunner.commitTransaction();
+      return nextSequenceNumber;
+    } catch (e) {
+      await queryRunner.rollbackTransaction();
+      throw new GameApiException(
+        e.message,
+        e.stack,
+        GameApiHttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   public async registerMintLog(mintLogEntity: MintLogEntity): Promise<void> {
@@ -52,9 +94,10 @@ export class MintRepository {
     return await this.mintLogRepo
       .createQueryBuilder('mintLogEntity')
       .where('mintLogEntity.requestId = :requestId', { requestId: requestId })
-      .andWhere(
-        'mintLogEntity.createdAt >= date_add(now(), interval -5 minute )',
-      )
+      // .andWhere(
+      //   'mintLogEntity.createdAt >= date_add(now(), interval -5 minute )',
+      // )
       .getOne();
   }
+
 }

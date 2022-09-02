@@ -1,4 +1,5 @@
 import { Key } from '@xpla/xpla.js';
+import {AccAddress} from "@xpla/xpla.js/dist/core";
 
 export const betagameInfoApi = (appId: string) => {
   return {
@@ -43,7 +44,7 @@ export const betagameFeeApi = (appId: string) => {
 };
 
 export const getMinterKey = async (): Promise<Key> => {
-  let hsmMinterKey: Key = undefined;
+  let hsmMinterKey: Key;
   return hsmMinterKey;
 };
 

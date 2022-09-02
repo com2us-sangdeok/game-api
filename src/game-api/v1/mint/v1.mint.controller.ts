@@ -1,12 +1,12 @@
-import { Body, Controller, Get, Headers, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post } from '@nestjs/common';
 import { V1MintService } from './v1.mint.service';
 import {
+  GameApiV1BurnItemDto, GameApiV1BurnItemResDto,
   GameApiV1MintDto,
   GameApiV1MintItemDto, GameApiV1ResMintItemDto,
   GameApiV1ResponseMintDto,
-  GameApiV1ResponseMintItemDto,
   GameApiV1ResponseValidItemDto,
-  GameApiV1ValidItemDto,
+  GameApiV1ValidItemDto, TestDto,
 } from '../dto/game-api-v1-mint.dto';
 import { ConvertPoolEntity } from '../../../entities';
 import {
@@ -17,7 +17,6 @@ import {
 } from '@nestjs/swagger';
 import { CommonResponseDto } from '../../../commom/dto/common-response.dto';
 import { GameApiHttpStatus } from '../../../exception/request.exception';
-import { GameApiV1BroadcastDto } from '../dto/game-api-v1-broadcast.dto';
 
 @ApiBearerAuth()
 @ApiTags('Game API')
@@ -49,6 +48,7 @@ export class V1MintController {
   @ApiResponse({
     status: 200,
     description: '',
+    type: GameApiV1ResponseMintDto
   })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   async mintNft(
@@ -63,6 +63,7 @@ export class V1MintController {
   @ApiResponse({
     status: 200,
     description: '',
+    type: GameApiV1ResMintItemDto
   })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   async items(
@@ -77,25 +78,27 @@ export class V1MintController {
   @ApiResponse({
     status: 200,
     description: '',
-    type: ConvertPoolEntity,
+    type: GameApiV1BurnItemResDto,
   })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
-  async burnNft(): Promise<CommonResponseDto<any>> {
-    const result = await this.gameApiService.burnNft();
+  async burnNft(
+    @Body() gameApiV1BurnItemDto: GameApiV1BurnItemDto,
+  ): Promise<CommonResponseDto<GameApiV1BurnItemResDto>> {
+    const result = await this.gameApiService.burnNft(gameApiV1BurnItemDto);
     return new CommonResponseDto(<any>GameApiHttpStatus.OK, 'success', result);
   }
 
-  @Get('/broadcast')
-  @ApiOperation({ summary: 'broadcast tx' })
+  @Post('/test/sign')
+  @ApiOperation({ summary: 'sign & broadcast test' })
   @ApiResponse({
     status: 200,
     description: '',
   })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
-  async broadcast(
-    @Body() gameApiV1BroadcastDto: GameApiV1BroadcastDto,
-  ): Promise<CommonResponseDto<any>> {
-    const result = await this.gameApiService.broadcast(gameApiV1BroadcastDto);
+  async testNft(
+      @Body() testDto: TestDto,
+  ): Promise<CommonResponseDto<string>> {
+    const result = await this.gameApiService.testNft(testDto);
     return new CommonResponseDto(<any>GameApiHttpStatus.OK, 'success', result);
   }
 }

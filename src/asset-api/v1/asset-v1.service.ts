@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { Asset } from './type/file';
 import { AssetEntity } from '../../entities/asset.entity';
-import { ImageUtil } from '../../util/image.util';
+// import { ImageUtil } from '../../util/image.util';
 import { customUuid } from '../../util/common.util';
 import { extname } from 'path';
 import { AssetDto, ImageDto } from './dto/asset-v1.dto';
@@ -24,7 +24,7 @@ export class AssetV1Service {
     private readonly assetRepository: AssetRepository,
     @Inject(WINSTON_MODULE_NEST_PROVIDER)
     private readonly logger: LoggerService,
-    private imageUtil: ImageUtil,
+    // private imageUtil: ImageUtil,
     private axiosClient: AxiosClientUtil,
     private s3: S3storageUtil,
   ) {}
@@ -35,10 +35,12 @@ export class AssetV1Service {
     try {
       const uploadedImageUrl = await this.s3.upload(imageName, file.buffer);
 
-      const thumbNail = await this.imageUtil.getImageBySharp(<ImageDto>{
-        buffer: file.buffer,
-        // filename: 'uploadImage.png'
-      });
+      // fixme: remove test code
+      // const thumbNail = await this.imageUtil.getImageBySharp(<ImageDto>{
+      //   buffer: file.buffer,
+      //   // filename: 'uploadImage.png'
+      // });
+      const thumbNail = {image: 'not available'}
       const thumbNailName = `thumbnail-${imageName}`;
       const uploadedThumbnailUrl = await this.s3.upload(
         thumbNailName,
@@ -64,7 +66,7 @@ export class AssetV1Service {
       throw new AssetException(
         e.message,
         e.stack,
-        AssetHttpStatus.IMAGE_UPLOAD_FAILED,
+        AssetHttpStatus.ASSET_UPLOAD_FAILED,
       );
     }
   }
@@ -79,12 +81,14 @@ export class AssetV1Service {
       const imageName = `${customUuid()}${extname(assetDto.url)}`;
       await this.s3.upload(imageName, response.data);
 
-      const thumbNail = await this.imageUtil.getImageBySharp(<ImageDto>{
-        buffer: null,
-        path: assetDto.url,
-        // filename: 'output.png',
-        isOriginal: false,
-      });
+      // fixme: remove test code
+      const thumbNail = {image: 'not available'}
+      // const thumbNail = await this.imageUtil.getImageBySharp(<ImageDto>{
+      //   buffer: null,
+      //   path: assetDto.url,
+      //   // filename: 'output.png',
+      //   isOriginal: false,
+      // });
       const thumbNailName = `thumbnail-${imageName}`;
       await this.s3.upload(thumbNailName, thumbNail.image);
 
@@ -113,7 +117,7 @@ export class AssetV1Service {
       throw new AssetException(
         e.message,
         e.stack,
-          AssetHttpStatus.IMAGE_URL_UPLOAD_FAILED,
+          AssetHttpStatus.ASSET_URL_UPLOAD_FAILED,
       );
     }
   }

@@ -47,9 +47,6 @@ export class MetadataV1Service {
       };
       return meta;
     } catch (e) {
-      // if (e instanceof GameApiException) {
-      // code for failover
-      // }
       this.logger.error(e);
       throw new MetadataException(
         e.message,

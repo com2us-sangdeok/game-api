@@ -12,14 +12,14 @@ import {
   GameApiException,
   GameApiHttpStatus,
 } from '../../../exception/request.exception';
-import { txEncoding, txDecoding } from '../../../util/encoding';
+import { txDecoding, txEncoding } from '../../../util/encoding';
 import { Msg } from '@xpla/xpla.js/dist/core';
 import { RequestContext } from '../../../commom/context/request.context';
 import { getNamespace } from 'cls-hooked';
 import { TransactionEntity } from '../../../entities';
-import { TxType } from '../../../enum';
+import { CurrencyUpdateType, TxStatus, TxType } from '../../../enum';
 import { ConvertRepository } from '../repository/convert.repository';
-import { MnemonicKey, Wallet, Tx } from '@xpla/xpla.js';
+import { MnemonicKey, Tx, Wallet } from '@xpla/xpla.js';
 
 @Injectable()
 export class V1ConvertService {
@@ -37,7 +37,10 @@ export class V1ConvertService {
     param: V1ConvertCurrencyInfoInputDto,
   ): Promise<any> {
     try {
-      return this.checkGameCurrency(param);
+      const currenctyInfo = await this.checkGameCurrency(param);
+      delete currenctyInfo.apiList;
+
+      return currenctyInfo;
     } catch (e) {
       console.log('%%%%%%%%%%%%%%%%%%%%%%');
       console.log(e);
@@ -56,6 +59,13 @@ export class V1ConvertService {
     const currency = currencyInfo.currency.filter(
       (v) => v.convertTypeCd === param.convertTypeCd,
     )[0];
+
+    //TODO
+    // 1. 게임재화->토큰, 게임재화->코인, 코인->게임재화, 토큰->게임재화
+    // - 입력 수량 체크 (입력수량<=0)
+    // - 토큰 보유수량 체크
+    // - 최소 교환 수량체크
+    // - 일일 한도 체크
 
     // if (param.amount < currency.minConvertQuantityOneTime) {
     //   return {
@@ -79,12 +89,14 @@ export class V1ConvertService {
 
     const splitAmount = param.amount.split('.');
 
+    if (splitAmount.length === 1) splitAmount.push('0');
+
     //교환수량 계산 입력값*교환비 => game-api 호출시 필요
-    const exchangeAmount = Number(param.amount) * Number(currency.exchangeRate);
+    // const exchangeAmount = Number(param.amount) * Number(currency.exchangeRate);
     const userAddress = param.accAddress;
 
-    //TODO . convert시 받을 주소 변경 필요!!
-    const receiverAddress = 'xpla16v6y48xllwy7amcmvhkv0a3zp7jepl44yvhvxt';
+    //TODO . convert시 받을 주소 provider가 맞는지?
+    const receiverAddress = currencyInfo.providerAddress;
     let msg: Msg;
 
     if (param.convertTypeCd === CommonCode.CONVERT_COIN_GAME) {
@@ -102,6 +114,13 @@ export class V1ConvertService {
     }
 
     if (param.convertTypeCd === CommonCode.CONVERT_TOKEN_GAME) {
+      if (!currencyInfo.tokenContract) {
+        throw new GameApiException(
+          'game token contract error',
+          '',
+          GameApiHttpStatus.INTERNAL_SERVER_ERROR,
+        );
+      }
       //bigint로 계산
       const tokenAmount =
         BigInt(splitAmount[0]) * 10n ** BigInt(currency.tokenAmount.decimals) +
@@ -111,7 +130,7 @@ export class V1ConvertService {
               BigInt(splitAmount[1].length));
 
       msg = await this.cw20Service.transferToken(
-        param.tokenContract,
+        currencyInfo.tokenContract,
         userAddress,
         receiverAddress,
         String(tokenAmount),
@@ -127,25 +146,15 @@ export class V1ConvertService {
     const unSignedTx: Tx = await this.commonService.makeTx(signer, [msg]);
     const encodedUnSignedTx = txEncoding(unSignedTx);
 
-    const data = {
-      gameIndex: param.gameIndex,
-      appId: param.appId,
-      serverId: param.serverId,
-      channelId: param.channelId,
-      playerId: param.playerId,
-      requestId: requestId,
-      //station-server와 같은 방법으로 인코딩
-      unSignedTx: encodedUnSignedTx,
-    };
-
     try {
       const txEntity = new TransactionEntity({
-        requestId,
+        requestId: requestId,
         senderAddress: userAddress,
-        contractAddress: param?.tokenContract,
+        contractAddress: currencyInfo?.tokenContract || null,
         tx: encodedUnSignedTx,
         params: JSON.stringify(param),
         txType: TxType.CONVERTTOCURRENCY,
+        status: TxStatus.WAIT,
         appId: param.appId,
         playerId: param.playerId,
       });
@@ -159,22 +168,11 @@ export class V1ConvertService {
       );
     }
 
-    //TODO. broadcast 삭제 필요
-    const sender = {
-      address: 'xpla1nlnang3a8wwgwx0sm4zut9ygx8mrvdes5n9m3g',
-      mnemonic:
-        'diet seed crumble ranch witness legal all swear goat night chef album gold useful antenna nose similar jazz elite cute wrestle enroll route unfold',
+    return {
+      requestId: requestId,
+      encodedUnSignedTx: encodedUnSignedTx,
+      ...param,
     };
-    try {
-      const tt = await this.convertBroadcast({
-        encodedUnSignedTx: encodedUnSignedTx,
-        mnemonoc: sender.mnemonic,
-      });
-      console.log(tt);
-      return { code: GameApiHttpStatus.OK, data: encodedUnSignedTx };
-    } catch (err) {
-      console.log(err);
-    }
   }
 
   //token : console wallet -> user wallet
@@ -189,26 +187,55 @@ export class V1ConvertService {
       (v) => v.convertTypeCd === param.convertTypeCd,
     )[0];
 
-    const exchangeRate = currency.exchangeRate;
+    //TODO 교환비 dummy
+    const exchangeRate = '100';
 
-    //게임 재화 수량 감소 업데이트 api 호출
-    const gameServerApiResult = { code: 1, message: 'success' };
+    const gameApiInfo = currencyInfo.apiList.filter(
+      (v) => v.apiTypeCd === CommonCode.GAME_USER_CURRENCY_UPDATE,
+    );
 
-    if (gameServerApiResult.code !== 1) {
-      //exception
-      return;
+    // //게임 재화 수량 감소 업데이트 api 호출(200 or 201이 아닐때)
+    // '1 = 게임재화 -> C2X, 2 = C2X -> 게임재화, 3 = 게임재화 -> 게임토큰, 4 = 게임토큰 -> 게임재화',
+    const gameCurrencyUpd = (
+      await this.axiosClientUtil.post(gameApiInfo[0].apiUrl, {
+        playerId: param.playerId,
+        server: [param.serverId, param.channelId],
+        selectedCid: param.characterId,
+        goodsCode: currency.goodsCode,
+        goodsName: currency.goodsName,
+        amount: -param.amount,
+        type:
+          currency.convertTypeCd === CommonCode.CONVERT_COIN_GAME
+            ? CurrencyUpdateType.CURRENCYTOXPLA
+            : CurrencyUpdateType.CURRENCYTOGAMETOKEN,
+      })
+    ).body;
+
+    if (
+      !(
+        GameApiHttpStatus.OK <= gameCurrencyUpd.code &&
+        gameCurrencyUpd.code <= GameApiHttpStatus.CREATED
+      )
+    ) {
+      throw new GameApiException(
+        'game-server-api update status Error',
+        JSON.stringify(gameCurrencyUpd),
+        GameApiHttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
+
     let decimals = 18n;
     let msg: Msg;
     if (param.convertTypeCd === CommonCode.CONVERT_TOKEN_GAME) {
       decimals = BigInt(currency.tokenAmount.decimals);
     }
+
     //token amount
     const tokenAmount =
       (BigInt(param.amount) * 10n ** decimals) / BigInt(exchangeRate);
 
     //TODO db에서 sequence number 가져오기 && HSM 연동 필요
-    const adminAddress = 'xpla16v6y48xllwy7amcmvhkv0a3zp7jepl44yvhvxt';
+    const adminAddress = currencyInfo.providerAddress;
 
     if (param.convertTypeCd === CommonCode.CONVERT_COIN_GAME) {
       msg = await this.commonService.transferCoin(
@@ -221,14 +248,12 @@ export class V1ConvertService {
 
     if (param.convertTypeCd === CommonCode.CONVERT_TOKEN_GAME) {
       msg = await this.cw20Service.transferToken(
-        param.tokenContract,
+        currencyInfo.tokenContract,
         adminAddress,
         param.accAddress,
         String(tokenAmount),
       );
     }
-
-    console.log(msg);
 
     const signer = [
       {
@@ -248,19 +273,16 @@ export class V1ConvertService {
       encodedUnSignedTx: encodedUnSignedTx,
       mnemonic: admin.mnemonic,
     });
-
-    console.log('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%');
-    console.log(txHash);
-    console.log('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%');
     try {
       const txEntity = new TransactionEntity({
         requestId,
         senderAddress: adminAddress,
-        contractAddress: param?.tokenContract,
+        contractAddress: currencyInfo?.tokenContract || null,
         tx: encodedUnSignedTx,
-        txHash: txHash.txhash,
+        txHash: txHash?.txhash || null,
         params: JSON.stringify(param),
         txType: TxType.CONVERTTOTOKEN,
+        status: TxStatus.PENDING,
         appId: param.appId,
         playerId: param.playerId,
       });
@@ -274,7 +296,11 @@ export class V1ConvertService {
         GameApiHttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
-    return msg;
+    return {
+      requestId: requestId,
+      txHash: txHash,
+      ...param,
+    };
   }
 
   //###############################################################
@@ -300,93 +326,92 @@ export class V1ConvertService {
   private async checkGameCurrency(
     param,
   ): Promise<V1ConvertCurrencyInfoOutputDto> {
-    //gameIndex, appId 별로 console-api 에서 게임 url정보 가져오기
-    //TODO. domain정해지면 바꾸기
-    // const gameUrlInfo: any = this.axiosClientUtil.get(
-    //   `https://hive-bc-game-api/${param.appId}`,
-    // );
+    //appId 별로 console-api 에서 게임 url정보 가져오기
+    let consoleGameInfo;
+    try {
+      consoleGameInfo = (
+        await this.axiosClientUtil.get(
+          `${process.env.CONSOLE_URL}/v1/game/${param.appId}`,
+        )
+      ).body;
+    } catch (err) {
+      throw new GameApiException(
+        err.message,
+        err.stack,
+        GameApiHttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
 
-    const consoleGameInfo = {
-      code: 200,
-      message: 'success',
-      data: {
-        id: 1,
-        company: 1,
-        gameindex: 1,
-        betagameLauncherId: 1,
-        appid: 'com.com2us.c2xwallet.global.normal',
-        gameTokenName: 'HST',
-        gameTokenImage: 'icon.png',
-        settingCompleteTypeCd: '1001000901',
-        apiSettingCompleteTypeCd: '1001000902',
-        activeTypeCd: '1001000601',
+    if (
+      !(
+        GameApiHttpStatus.OK <= consoleGameInfo.code &&
+        consoleGameInfo.code <= GameApiHttpStatus.CREATED
+      )
+    ) {
+      throw new GameApiException(
+        'console-api Status Error',
+        JSON.stringify(consoleGameInfo),
+        GameApiHttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
 
-        convert: [
-          //xpla<->game currency
-          {
-            convertTypeCd: '1001000801',
-            goodsName: 'soulstone',
-            goodsCode: 'soulstoneCode',
-            goodsImage: 'soulstone.png',
-            minConvertQuantityOneTime: 1000,
-            maxConvertQuantityDays: 100000,
-            exchangeRate: 1000,
-          },
-          //game token <-> game currency
-          {
-            convertTypeCd: '1001000802',
-            goodsName: 'gold',
-            goodsCode: 'goldCode',
-            goodsImage: 'gold.png',
-            minConvertQuantityOneTime: 1000,
-            maxConvertQuantityDays: 100000,
-            exchangeRate: 100,
-          },
-        ],
-      },
-    };
+    let gameCurrencyInfo;
 
-    const haveCurrencyInfo = [
-      //1001000801 => (xpla<->soulstone)
-      {
-        goodsCode: 'goldCode',
-        goodsName: 'gold',
-        amount: 100000,
-        avalibleAmount: 10000,
-      },
-      //1001000802 => (HST<->gold)
-      {
-        goodsCode: 'soulstoneCode',
-        goodsName: 'soulstone',
-        amount: 1000000,
-        avalibleAmount: 100000,
-      },
-    ];
+    if (consoleGameInfo.data.apiLists.length > 0) {
+      const gameApiInfo = consoleGameInfo.data.apiLists.filter(
+        (v) => v.apiTypeCd === CommonCode.GAME_USER_CURRENCY,
+      );
 
-    //TODO xpla로 변경 필요
+      if (gameApiInfo.length > 0) {
+        gameCurrencyInfo = (
+          await this.axiosClientUtil.post(gameApiInfo[0].apiUrl, {
+            playerId: param.playerId,
+            server: [param.serverId, param.channelId],
+            selectedCid: param.characterId,
+          })
+        ).body;
+      }
+    }
+
+    if (
+      !(
+        GameApiHttpStatus.OK <= gameCurrencyInfo.code &&
+        consoleGameInfo.code <= GameApiHttpStatus.CREATED
+      )
+    ) {
+      throw new GameApiException(
+        'game-server-api get currency Status Error',
+        JSON.stringify(gameCurrencyInfo),
+        GameApiHttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
     const xplaBalance = (
       await this.commonService.getBalance(param.accAddress)
     ).filter((v) => v.denom === 'axpla')[0];
 
-    let gameTokenBalance: any = await this.cw20Service.tokenBalance(
-      param.tokenContract,
-      param.accAddress,
-    );
+    let gameTokenBalance: any = {};
+    if (consoleGameInfo.data?.gameTokenContract) {
+      gameTokenBalance = await this.cw20Service.tokenBalance(
+        consoleGameInfo.data.gameTokenContract,
+        param.accAddress,
+      );
 
-    gameTokenBalance = {
-      tokenName: gameTokenBalance.tokenName,
-      tokenSymbol: gameTokenBalance.tokenSymbol,
-      decimals: gameTokenBalance.decimals,
-      amount: gameTokenBalance.balance?.balance,
-    };
+      gameTokenBalance = {
+        tokenName: gameTokenBalance.tokenName,
+        tokenSymbol: gameTokenBalance.tokenSymbol,
+        decimals: gameTokenBalance.decimals,
+        amount: gameTokenBalance.balance?.balance,
+      };
+    }
 
-    const currency = consoleGameInfo.data.convert.map((v) => {
-      let tempAmount: number;
-      let tempAvalibleAmount: number;
-      for (let i = 0; i < haveCurrencyInfo.length; i++) {
-        if (v.goodsCode === haveCurrencyInfo[i].goodsCode) {
-          tempAmount = haveCurrencyInfo[i].amount;
-          tempAvalibleAmount = haveCurrencyInfo[i].avalibleAmount;
+    const currency = consoleGameInfo.data.convertLists.map((v) => {
+      let tempAmount: number = 0;
+      let tempAvalibleAmount: number = 0;
+      for (let i = 0; i < gameCurrencyInfo.length; i++) {
+        if (v.goodsCode === gameCurrencyInfo[i].goodsCode) {
+          tempAmount = gameCurrencyInfo[i].amount;
+          tempAvalibleAmount = gameCurrencyInfo[i].avalibleAmount;
         }
       }
 
@@ -416,16 +441,15 @@ export class V1ConvertService {
       };
     });
 
-    //game api 호출!(제약사항, 해당 유저 컨버트 가능 수량등 정보 필요)
-    //TODO. dummy data 수정 필요
-    // let currencyInfo = this.axiosClientUtil.post(gameUrlInfo.url, {});
-
     return {
-      gameIndex: consoleGameInfo.data.gameindex,
+      // gameIndex: consoleGameInfo.data.gameindex,
       appId: consoleGameInfo.data.appid,
-      serverId: '1',
-      channelId: '1',
-      playerId: '1',
+      serverId: param.serverId,
+      playerId: param.playerId,
+      characterId: param.characterId,
+      providerAddress: consoleGameInfo.data.gameProviderAddress,
+      tokenContract: consoleGameInfo.data?.gameTokenContract || null,
+      apiList: consoleGameInfo.data?.apiLists || null,
       currency: currency,
     };
   }

@@ -20,27 +20,31 @@ export class CommonService {
         msgs: msgs,
       });
     } catch (err) {
-      console.log(err);
       throw new BlockchainException(
-        err.message,
-        err?.code,
+        err.response.message,
+        err.response?.data,
         BlockchainStatus.CREATE_TX_ERROR,
       );
     }
   }
 
-  public async sign(wallet: Wallet, tx: Tx): Promise<Tx> {
+  public async sign(wallet: Wallet, tx: Tx, sequence?: number): Promise<Tx> {
     const walletInfo = await wallet.accountNumberAndSequence();
+
     try {
       const sign = await wallet.key.signTx(tx, {
         chainID: this.lcd.config.chainID,
         signMode: SignMode.SIGN_MODE_LEGACY_AMINO_JSON,
-        sequence: walletInfo.sequence,
+        sequence: sequence ? sequence : walletInfo.sequence,
         accountNumber: walletInfo.account_number,
       });
       return sign;
     } catch (err) {
-      console.log(err);
+      throw new BlockchainException(
+        err.response.message,
+        err.response?.data,
+        BlockchainStatus.SIGN_ERROR,
+      );
     }
   }
 
@@ -54,12 +58,28 @@ export class CommonService {
     amount: string,
     denom: string,
   ): Promise<MsgSend> {
-    return new MsgSend(sender, receiver, amount + denom);
+    try {
+      return new MsgSend(sender, receiver, amount + denom);
+    } catch (err) {
+      throw new BlockchainException(
+        err.response.message,
+        err.response?.data,
+        BlockchainStatus.TRANSFER_COIN_ERROR,
+      );
+    }
   }
 
   // TODO. game-api 서버에서 broadcast 기능 없애야함
   // Queue에 넣고 consumer에서 처리
   public async broadcast(signedTx: Tx): Promise<any> {
-    return await this.lcd.tx.broadcastSync(signedTx);
+    try {
+      return await this.lcd.tx.broadcastSync(signedTx);
+    } catch (err) {
+      throw new BlockchainException(
+        err.response.message,
+        err.response?.data,
+        BlockchainStatus.BROADCAST_ERROR,
+      );
+    }
   }
 }

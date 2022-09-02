@@ -1,22 +1,19 @@
-import { Inject, Injectable, LoggerService } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import {HttpException, HttpStatus, Inject, Injectable, LoggerService} from '@nestjs/common';
 import {
+  GameApiV1BurnItemDto,
+  GameApiV1BurnItemResDto,
   GameApiV1CalculateMintingFeeDto,
   GameApiV1MintDto,
-  GameApiV1MintItemDto, GameApiV1ResMintItemDto,
+  GameApiV1MintItemDto,
+  GameApiV1ResMintItemDto,
   GameApiV1ResponseMintDto,
   GameApiV1ResponseValidItemDto,
   GameApiV1ValidItemDto,
+  TestDto,
 } from '../dto/game-api-v1-mint.dto';
 import { ConfigService } from '@nestjs/config';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { BlockchainService } from '../../../bc-core/blockchain/blockchain.service';
-import {
-  betagameInfoApi,
-  getMinterKey,
-  updateGameServerForMintingApi,
-} from '../game-api.mock';
 import { LockService } from '../../../bc-core/modules/contract/lock.service';
 import {
   GameApiException,
@@ -27,18 +24,15 @@ import { AssetV1Service } from '../../../asset-api/v1/asset-v1.service';
 import { CW20Service } from '../../../bc-core/modules/contract/cw20.service';
 import { CW721Service } from '../../../bc-core/modules/contract/cw721.service';
 import { MintRepository } from '../repository/mint.repository';
-import { Fee, SimplePublicKey } from '@xpla/xpla.js';
 import { CommonService } from '../../../bc-core/modules/common.service';
 import {
-  ConvertPoolEntity,
   MintLogEntity,
-  NonFungibleTokenEntity,
+  TokenIdEntity,
+  TransactionEntity,
 } from '../../../entities';
 import { getNamespace } from 'cls-hooked';
 import { RequestContext } from '../../../commom/context/request.context';
 import { compareObject } from '../../../util/common.util';
-import { GameApiV1BroadcastDto } from '../dto/game-api-v1-broadcast.dto';
-import { Tx as Tx_pb } from '@terra-money/terra.proto/cosmos/tx/v1beta1/tx';
 import { Tx } from '@xpla/xpla.js/dist/core';
 import { SequenceUtil } from '../../../util/sequence.util';
 import { MetadataV1Service } from '../../../metadata-api/v1/metadata-v1.service';
@@ -47,58 +41,64 @@ import {
   MintHttpStatus,
 } from '../../../exception/mint.exception';
 import { GameCategory, GameServerApiCode } from '../../../enum/game-api.enum';
-import { MintType } from '../../../enum';
-
+import { MintType, TxStatus, TxType } from '../../../enum';
+import { txDecoding, txEncoding } from '../../../util/encoding';
+import BigNumber from 'bignumber.js';
+import { TransactionRepository } from '../repository/transaction.repository';
 
 @Injectable()
 export class V1MintService {
   private bcClient = this.blockchainService.blockChainClient().client;
   private lcdClient = this.blockchainService.lcdClient();
-
   private CATEGORY_MINT_TYPE = new Map(
-      Object.entries({
-        item: GameCategory.MINT_ITEM,
-        items: GameCategory.MINT_ITEMS,
-        character: GameCategory.MINT_CHARACTER,
-      }),
+    Object.entries({
+      item: GameCategory.MINT_ITEM,
+      items: GameCategory.MINT_ITEMS,
+      character: GameCategory.MINT_CHARACTER,
+    }),
   );
-
-  private MINT_LIST_API_TYPE = new Map(
-      Object.entries({
-        item: GameServerApiCode.MINT_ITEM_LIST,
-        character: GameServerApiCode.MINT_CHARACTER_LIST,
-      }),
+  private MINT_API_TYPE = new Map(
+    Object.entries({
+      item: GameServerApiCode.MINT_ITEM_LIST,
+      character: GameServerApiCode.MINT_CHARACTER_LIST,
+      mint: GameServerApiCode.MINT,
+      lock: GameServerApiCode.LOCK_ITEM_NFT,
+      // lock: GameServerApiCode.LOCK_CHARACTER_NFT,
+    }),
+  );
+  private readonly BC_DECIMAL = Number(this.configService.get('BC_DECIMAL'));
+  private readonly BC_GAME_DECIMAL = Number(
+    this.configService.get('BC_GAME_DECIMAL'),
   );
 
   constructor(
-    private configService: ConfigService,
-    private readonly blockchainService: BlockchainService,
-    @InjectRepository(ConvertPoolEntity)
-    private readonly usersRepository: Repository<ConvertPoolEntity>,
     @Inject(WINSTON_MODULE_NEST_PROVIDER)
     private readonly logger: LoggerService,
+    private sequenceUtil: SequenceUtil,
+    private axiosClient: AxiosClientUtil,
+    private configService: ConfigService,
+    private readonly blockchainService: BlockchainService,
     private readonly cw20Service: CW20Service,
     private readonly cw721Service: CW721Service,
     private readonly lockService: LockService,
-    private axiosClient: AxiosClientUtil,
-    private assetV1Service: AssetV1Service,
     private readonly metadataV1Service: MetadataV1Service,
-    private readonly gameApiRepository: MintRepository,
     private commonService: CommonService,
-    private sequenceUtil: SequenceUtil,
+    private assetV1Service: AssetV1Service,
+    private readonly mintRepo: MintRepository,
+    private readonly txRepo: TransactionRepository,
   ) {}
 
   async confirmItems(
-    gameApiV1ValidItemDto: GameApiV1ValidItemDto,
+    reqDto: GameApiV1ValidItemDto,
   ): Promise<GameApiV1ResponseValidItemDto> {
     const requestId = getNamespace(RequestContext.NAMESPACE).get(
-      RequestContext.CORRELATION_ID,
+      RequestContext.REQUEST_ID,
     );
 
     try {
-      const gameServerData = await this.gameServerData(gameApiV1ValidItemDto);
+      const gameServerData = await this.gameServerData(reqDto.appId);
 
-      // fixme: use apiLists
+      // fixme: change the test code
       // replyForMint = gameServerInfo.body.data.apiLists.filter(
       //   (item) => item.apiTypeCd === ApiTypeCode.NOTI_OF_COMPLETION_FOR_MINT,
       // )[0];
@@ -106,19 +106,16 @@ export class V1MintService {
         (item) => item.apiTypeCd === GameServerApiCode.CONFIRM_MINTING,
       )[0];
 
-      const mintingFee = await this.calculateMintingFee(
-        gameApiV1ValidItemDto,
-        gameServerData,
-      );
+      const mintingFee = await this.calculateMintingFee(reqDto, gameServerData);
 
       // call game server to confirm items
       const confirmedItem = await this.axiosClient.post(
         gameServerApi.apiUrl,
         {
-          playerId: gameApiV1ValidItemDto.playerId,
-          server: gameApiV1ValidItemDto.server,
-          selectedCid: gameApiV1ValidItemDto.selectedCid,
-          items: gameApiV1ValidItemDto.items,
+          playerId: reqDto.playerId,
+          server: reqDto.server,
+          selectedCid: reqDto.selectedCid,
+          items: reqDto.items,
         },
         {
           correlationId: requestId,
@@ -126,20 +123,20 @@ export class V1MintService {
       );
       if (!(confirmedItem.status === 200 || confirmedItem.status === 201)) {
         throw new GameApiException(
-          'bad request',
+          'failed to respond on game server',
           '',
-          GameApiHttpStatus.BAD_REQUEST,
+          GameApiHttpStatus.EXTERNAL_SERVER_ERROR,
         );
       }
 
-      await this.gameApiRepository.registerMintLog(<MintLogEntity>{
+      await this.mintRepo.registerMintLog(<MintLogEntity>{
         requestId: requestId,
-        mintType: gameApiV1ValidItemDto.mintType,
-        playerId: gameApiV1ValidItemDto.playerId,
-        server: gameApiV1ValidItemDto.server.join(),
-        accAddress: gameApiV1ValidItemDto.accAddress,
-        appId: gameApiV1ValidItemDto.appId,
-        goodsId: confirmedItem.body.data.uniqueId,
+        mintType: reqDto.mintType,
+        playerId: reqDto.playerId,
+        server: reqDto.server.join(),
+        accAddress: reqDto.accAddress,
+        appId: reqDto.appId,
+        id: confirmedItem.body.data.uniqueId,
         serviceFee: mintingFee.serviceFee,
         gameFee: mintingFee.gameFee,
       });
@@ -164,128 +161,192 @@ export class V1MintService {
     gameApiV1ValidItemDto: GameApiV1ValidItemDto,
     gameServer: any,
   ): Promise<GameApiV1CalculateMintingFeeDto> {
-    if (
-      gameApiV1ValidItemDto.tokens !== undefined ||
-      gameApiV1ValidItemDto.tokens.length > 0
-    ) {
-      // const lockedNft = await this.lockService.lockNftList(
-      //   gameServer.nftContract,
-      //   gameApiV1ValidItemDto.accAddress,
-      // );
-      // let unmatchedToken = [];
-      // if (lockedNft !== undefined) {
-      //   unmatchedToken = gameApiV1ValidItemDto.tokens.filter(
-      //     (token) => !lockedNft.tokens.includes(token.tokenId),
-      //   );
-      // }
-      // this.logger.debug(lockedNft);
-      // this.logger.debug(unmatchedToken);
-      // if (unmatchedToken.length > 0) {
-      //   throw new GameApiException(
-      //     'token id mismatched',
-      //     '',
-      //     GameApiHttpStatus.BAD_REQUEST,
-      //   );
-      // }
-    }
+    const tokenData = gameApiV1ValidItemDto.tokens ?? false;
+    const itemData = gameApiV1ValidItemDto.items ?? false;
 
-    // active category from betagame
-    const category = gameServer.categoryLists.filter(
-      (item) =>
-        item.mintTypeCd ===
-          this.CATEGORY_MINT_TYPE.get(gameApiV1ValidItemDto.mintType) &&
-        // todo: active? 리스트에서 비노출?
-        item.activeTypeCd === GameCategory.ACTIVE,
-    )[0];
-
-    // todo: calculate minting fee
-    //      call betagame to get fee info
-    let serviceFee: number = 0;
-    let gameFee: number = 0;
-    switch (gameApiV1ValidItemDto.mintType) {
-      case MintType.ITEM || MintType.CHARACTER:
-        serviceFee = Number(category.feeInfo.xplaFee);
-        gameFee = Number(category.feeInfo.gameTokenFee);
-        break;
-      case 'items':
-        break;
-    }
-
-    // todo: get fee by fee code from betagame
-    // await gameApiV1MintDto.items.forEach(function (item) {
-    // })
-    // await gameApiV1MintDto.tokens.forEach(function (item) {
-    // })
-
-    const userTokenBalance = 12;
-    // await this.bcClient.getBalance(
-    //   gameApiV1ValidItemDto.accAddress,
-    // );
-    if (userTokenBalance < serviceFee) {
+    // fixme: 조건 정리
+    //  1.token or item
+    //  2.item: one item or one token
+    //  3.character: one item or one token
+    //  4.items: items or tokens
+    if (!tokenData && !itemData) {
       throw new GameApiException(
-        'user token balance is insufficient.',
+        'token or item is required.',
         '',
         GameApiHttpStatus.BAD_REQUEST,
       );
+    } else if (tokenData && itemData) {
+      if (gameApiV1ValidItemDto.mintType !== 'items') {
+        throw new GameApiException(
+          'token and item requested!',
+          '',
+          GameApiHttpStatus.BAD_REQUEST,
+        );
+      }
+    } else if (tokenData && gameApiV1ValidItemDto.mintType !== 'items') {
+      if (tokenData.length > 1) {
+        throw new GameApiException(
+          'more than one token requested!',
+          '',
+          GameApiHttpStatus.BAD_REQUEST,
+        );
+      }
+    } else if (itemData && gameApiV1ValidItemDto.mintType !== 'items') {
+      if (itemData.length > 1) {
+        throw new GameApiException(
+          'more than one item requested!',
+          '',
+          GameApiHttpStatus.BAD_REQUEST,
+        );
+      }
     }
 
-    const userGameTokenBalance = 12;
-    //     await this.bcClient.getBalance(
-    //   gameApiV1ValidItemDto.accAddress,
-    // );
-    if (userGameTokenBalance < gameFee) {
+    // validate locked nft
+    if (tokenData && tokenData.length > 0) {
+      let requestedTokens = [];
+      gameApiV1ValidItemDto.tokens.forEach((token) => {
+        requestedTokens.push(token.tokenId);
+      });
+      const lockedNft = await this.validateLockNft(
+        gameServer.nftContract,
+        gameApiV1ValidItemDto.accAddress,
+        requestedTokens,
+      );
+      if (lockedNft) {
+        throw new MintException(
+          'requested token is already existed!',
+          '',
+          MintHttpStatus.NFT_EXISTED,
+        );
+      }
+    }
+
+    // get active category from betagame
+    const category =
+      gameServer.categoryLists.filter(
+        (item) =>
+          item.mintTypeCd ===
+            this.CATEGORY_MINT_TYPE.get(gameApiV1ValidItemDto.mintType) &&
+          item.activeTypeCd === GameCategory.ACTIVE,
+      )[0] ?? false;
+    if (!category) {
       throw new GameApiException(
+        `category not found`,
+        '',
+        GameApiHttpStatus.NOT_FOUND,
+      );
+    }
+
+    // calculate fee
+    let serviceFee = new BigNumber(0);
+    let gameFee = new BigNumber(0);
+    const digits = BigNumber(10 ** this.BC_DECIMAL);
+    switch (gameApiV1ValidItemDto.mintType) {
+      case 'item' || 'character':
+        serviceFee = BigNumber(category.feeInfo[0].xplaFee).times(digits);
+        gameFee = BigNumber(category.feeInfo[0].gameTokenFee).times(digits);
+        break;
+      case 'items':
+        const feeLIst = category.feeInfo;
+
+        if (itemData && itemData.length > 0) {
+          gameApiV1ValidItemDto.items.forEach(function (gameItem) {
+            const mintingFee = feeLIst.filter(
+              (feeInfo) => feeInfo.mintCount === gameItem.mintingFeeCode,
+            )[0];
+
+            serviceFee = BigNumber(mintingFee.xplaFee)
+              .times(digits)
+              .plus(serviceFee);
+            gameFee = BigNumber(mintingFee.gameTokenFee)
+              .times(digits)
+              .plus(gameFee);
+          });
+        }
+
+        if (tokenData && tokenData.length > 0) {
+          gameApiV1ValidItemDto.tokens.forEach(function (gameItem) {
+            const mintingFee = feeLIst.filter(
+              (feeInfo) => feeInfo.mintCount === gameItem.mintingFeeCode,
+            )[0];
+
+            serviceFee = BigNumber(mintingFee.xplaFee)
+              .times(digits)
+              .plus(serviceFee);
+            gameFee = BigNumber(mintingFee.gameTokenFee)
+              .times(digits)
+              .plus(gameFee);
+          });
+        }
+        break;
+    }
+
+    const userTokenBalance = await this.bcClient.getBalance(
+      gameApiV1ValidItemDto.accAddress,
+    );
+    if (userTokenBalance < serviceFee.div(digits)) {
+      throw new MintException(
+        'user token balance is insufficient.',
+        '',
+        MintHttpStatus.NOT_ENOUGH_TOKEN,
+      );
+    }
+
+    const userGameTokenBalance = await this.bcClient.getBalance(
+      gameApiV1ValidItemDto.accAddress,
+    );
+    if (userGameTokenBalance < gameFee.div(digits)) {
+      throw new MintException(
         'game token balance is insufficient.',
         '',
-        GameApiHttpStatus.BAD_REQUEST,
+          MintHttpStatus.NOT_ENOUGH_TOKEN,
       );
     }
 
     return <GameApiV1CalculateMintingFeeDto>{
-      serviceFee: serviceFee,
-      gameFee: gameFee,
+      serviceFee: serviceFee.div(digits).toFixed(this.BC_DECIMAL),
+      gameFee: gameFee.div(digits).toFixed(this.BC_DECIMAL),
     };
   }
 
-  async mintNft(
-    gameApiV1MintDto: GameApiV1MintDto,
-  ): Promise<GameApiV1ResponseMintDto> {
+  async mintNft(reqDto: GameApiV1MintDto): Promise<GameApiV1ResponseMintDto> {
+    const requestId = getNamespace(RequestContext.NAMESPACE).get(
+      RequestContext.REQUEST_ID,
+    );
+
     try {
+      // todo: burn and mint
+      //   tokenId exists?
+      const gameServerData = await this.gameServerData(reqDto.appId);
 
-      const gameServerData = await this.gameServerData(gameApiV1MintDto);
-
-      // fixme: use apiLists
+      // fixme: change the test code
       // replyForMint = gameServerInfo.body.data.apiLists.filter(
       //   (item) => item.apiTypeCd === ApiTypeCode.NOTI_OF_COMPLETION_FOR_MINT,
       // )[0];
       const gameServerApi = gameServerData.apiTestLists.filter(
-          (item) => item.apiTypeCd === this.MINT_LIST_API_TYPE.get(gameApiV1MintDto.mintType),
+        (item) => item.apiTypeCd === this.MINT_API_TYPE.get('mint'),
       )[0];
 
-
-      // // todo: call betagame api for api url
-      // // const betagameInfo = await this.axiosClient.get('/v1/')
-      const betagame = betagameInfoApi(gameApiV1MintDto.appId);
       // fixme: redis로 변경
       // todo: 시간확인 필요?
-      const mintLog = await this.gameApiRepository.getMintLogByRequestId(
-        gameApiV1MintDto.requestId,
+      const mintLog = await this.mintRepo.getMintLogByRequestId(
+        reqDto.requestId,
       );
 
-      let c2xFee;
-      let tokenFee;
+      let serviceFee;
+      let gameFee;
       if (mintLog !== null || mintLog !== undefined) {
         if (
           !compareObject(
             {
-              appId: gameApiV1MintDto.appId,
-              playerId: String(gameApiV1MintDto.playerId),
-              accAddress: gameApiV1MintDto.accAddress,
-              mintType: gameApiV1MintDto.mintType,
-              requestId: gameApiV1MintDto.requestId,
-              goodsId: gameApiV1MintDto.id,
-              ctxFee: String(gameApiV1MintDto.ctxFee),
-              tokenFee: String(gameApiV1MintDto.tokenFee),
+              appId: reqDto.appId,
+              playerId: String(reqDto.playerId),
+              accAddress: reqDto.accAddress,
+              mintType: reqDto.mintType,
+              requestId: reqDto.requestId,
+              id: reqDto.id,
+              serviceFee: reqDto.serviceFee,
+              gameFee: reqDto.gameFee,
             },
             {
               appId: mintLog.appId,
@@ -293,249 +354,237 @@ export class V1MintService {
               accAddress: mintLog.accAddress,
               mintType: mintLog.mintType,
               requestId: mintLog.requestId,
-              goodsId: mintLog.goodsId,
-              ctxFee: String(mintLog.serviceFee),
-              tokenFee: String(mintLog.gameFee),
+              id: mintLog.id,
+              serviceFee: String(mintLog.serviceFee),
+              gameFee: String(mintLog.gameFee),
             },
           )
         ) {
           throw new GameApiException(
-            'error occurred while comparing minting items',
+            'requested data mismatched with confirmed data',
             '',
-            GameApiHttpStatus.INTERNAL_SERVER_ERROR,
+            GameApiHttpStatus.BAD_REQUEST,
           );
         }
-        c2xFee = gameApiV1MintDto.ctxFee;
-        tokenFee = gameApiV1MintDto.tokenFee;
+        serviceFee = reqDto.serviceFee;
+        gameFee = reqDto.gameFee;
       } else {
-        const mintingFee = await this.calculateMintingFee(
-          gameApiV1MintDto,
-          betagame,
+        throw new GameApiException(
+          'need to confirm item before minting',
+          '',
+          GameApiHttpStatus.BAD_REQUEST,
         );
-        c2xFee = mintingFee.serviceFee;
-        tokenFee = mintingFee.gameFee;
       }
+      // else {
+      //   const mintingFee = await this.calculateMintingFee(
+      //     gameApiV1MintDto,
+      //     betagame,
+      //   );
+      //   c2xFee = mintingFee.serviceFee;
+      //   tokenFee = mintingFee.gameFee;
+      // }
 
       // todo: call game server for updating game info
-      // const updatedGameRes = await this.axiosClient.post('http://localhost:7423/v1/game/game-code/user/user-id/item/item-code/mint',{
-      //     gameId: '',
-      //     serverId: '',
-      //     channelId: '',
-      //     characterId: '',
-      //     tokenId: '',
-      //     itemId: ''
-      // })
-      const updatedGameRes = updateGameServerForMintingApi({
-        gameId: '',
-        serverId: '',
-        channelId: '',
-        characterId: '',
-        categoryCode: '',
-        tokenId: '',
-        itemId: '',
+      const updatedGameRes = await this.axiosClient.post(gameServerApi.apiUrl, {
+        playerId: reqDto.playerId,
+        server: reqDto.server,
+        selectedCid: reqDto.selectedCid,
+        id: reqDto.id,
+        mintType: reqDto.mintType,
+        requestId: reqDto.requestId,
       });
 
+      if (!(updatedGameRes.status === 200 || updatedGameRes.status === 201)) {
+        throw new GameApiException(
+          'failed to respond on game server to update game item',
+          '',
+          GameApiHttpStatus.EXTERNAL_SERVER_ERROR,
+        );
+      }
+
       // todo: get minter from hsm
-      const minter = await getMinterKey();
+      // const minter = {
+      //   accAddress: 'xpla16v6y48xllwy7amcmvhkv0a3zp7jepl44yvhvxt',
+      //   // publicKey: ''
+      // }; //await getMinterKey();
+      const minter = {
+        address: 'xpla16v6y48xllwy7amcmvhkv0a3zp7jepl44yvhvxt',
+        mnemonic:
+          'predict junior nation volcano boat melt glance climb target rubber lyrics rain fall globe face catch plastic receive antique picnic domain head hat glue',
+      };
 
       // todo: create a token id
-      const tokenId = String(
-        await this.gameApiRepository.getNftId(<NonFungibleTokenEntity>{
-          gameIndex: gameApiV1MintDto.gameIndex,
-          accAddress: gameApiV1MintDto.accAddress,
-          playerId: gameApiV1MintDto.playerId,
-        }),
-      );
-
-      if (updatedGameRes.code !== 200) {
-        throw new GameApiException(
-          'error occurred while updating item status for minting.',
-          '',
-          GameApiHttpStatus.INTERNAL_SERVER_ERROR,
+      //   if provider have more than two nft contracts
+      let tokenId = reqDto.id;
+      if (tokenId === '') {
+        tokenId = String(
+          await this.mintRepo.getNftId(<TokenIdEntity>{
+            nftAddress: gameServerData.nftContract,
+            appId: reqDto.appId,
+          }),
         );
       }
 
       const uploadedImage = await this.assetV1Service.uploadImageByUrl({
-        url: gameApiV1MintDto.metadata.image,
+        url: reqDto.metadata.image,
       });
 
-      gameApiV1MintDto.metadata.image = uploadedImage.uri;
-      gameApiV1MintDto.metadata.attributes.push({ trait_type: '', value: '' });
+      reqDto.metadata.image = uploadedImage.uri;
+      reqDto.metadata.attributes.push({
+        trait_type: 'thumbnailUri',
+        value: uploadedImage.thumbnailUri,
+      });
       const uploadedMetadata = await this.metadataV1Service.uploadMetadata(
-        gameApiV1MintDto.metadata,
+        reqDto.metadata,
       );
 
-      // C2X
-      // todo: create tx
-      //  gameProvider, token contract required (if the token contract is the governance token)
-      const c2xContractAddress = '';
-      const gameProviderAddress = betagame.data.gameProviderAddress;
-      const gameProviderC2xAmount = String(Math.round(c2xFee * 0.5));
-      const gameProviderC2xExe = await this.cw20Service.transferToken(
-        c2xContractAddress,
-        gameApiV1MintDto.accAddress,
+      // xpla
+      const digits = BigNumber(10 ** this.BC_DECIMAL);
+      const gameProviderAddress = gameServerData.gameProviderAddress;
+      const gameProviderC2xAmount = BigNumber(serviceFee)
+        .times(digits)
+        .times(0.5);
+      const gameProviderC2xExe = await this.commonService.transferCoin(
+        reqDto.accAddress,
         gameProviderAddress,
-        gameProviderC2xAmount,
+        String(gameProviderC2xAmount),
+        'axpla',
       );
 
-      const treasuryAddress = betagame.data.treasuryAddress;
-      const treasuryC2xAmount = String(Math.round(c2xFee * 0.16));
-      const treasuryC2xExe = await this.cw20Service.transferToken(
-        c2xContractAddress,
-        gameApiV1MintDto.accAddress,
+      const treasuryAddress = gameServerData.treasuryAddress;
+      const treasuryC2xAmount = BigNumber(serviceFee).times(digits).times(0.16);
+      const treasuryC2xExe = await this.commonService.transferCoin(
+        reqDto.accAddress,
         treasuryAddress,
-        treasuryC2xAmount,
+        String(treasuryC2xAmount),
+        'axpla',
       );
 
-      const serverAddress = betagame.data.serverAddress;
-      const serverC2xAmount = String(Math.round(c2xFee * 0.04));
-      const serverC2xExe = await this.cw20Service.transferToken(
-        c2xContractAddress,
-        gameApiV1MintDto.accAddress,
+      const serverAddress = gameServerData.serverAddress;
+      const serverC2xAmount = BigNumber(serviceFee).times(digits).times(0.04);
+      const serverC2xExe = await this.commonService.transferCoin(
+        reqDto.accAddress,
         serverAddress,
-        serverC2xAmount,
+        String(serverC2xAmount),
+        'axpla',
       );
 
-      const c2xHolderAddress = betagame.data.c2xHolderAddress;
-      const c2XHolderC2xAmount = String(Math.round(c2xFee * 0.3));
-      const c2XHolderC2xExe = await this.cw20Service.transferToken(
-        c2xContractAddress,
-        gameApiV1MintDto.accAddress,
+      const c2xHolderAddress = gameServerData.xplaHolderAddress;
+      const c2XHolderC2xAmount = BigNumber(serviceFee).times(digits).times(0.3);
+      const c2XHolderC2xExe = await this.commonService.transferCoin(
+        reqDto.accAddress,
         c2xHolderAddress,
-        c2XHolderC2xAmount,
+        String(c2XHolderC2xAmount),
+        'axpla',
       );
 
       // token
-      const gameTokenContractAddress = betagame.data.gameTokenCa;
-      const minterAddress = minter.accAddress;
-      const minterTokenAmount = String(Math.round(tokenFee * 0.5));
+      const game_digits = BigNumber(10 ** this.BC_GAME_DECIMAL);
+      const gameTokenContractAddress = gameServerData.gameTokenContract;
+      const minterAddress = minter.address;
+      const minterTokenAmount = BigNumber(gameFee)
+        .times(game_digits)
+        .times(0.5);
       const minterTokenExe = await this.cw20Service.transferToken(
         gameTokenContractAddress,
-        gameApiV1MintDto.accAddress,
+        reqDto.accAddress,
         minterAddress,
-        minterTokenAmount,
+        String(minterTokenAmount),
       );
 
-      // const treasuryAddress = '';
-      const treasuryTokenAmount = String(Math.round(tokenFee * 0.16));
+      const treasuryTokenAmount = BigNumber(gameFee)
+        .times(game_digits)
+        .times(0.16);
       const treasuryTokenExe = await this.cw20Service.transferToken(
         gameTokenContractAddress,
-        gameApiV1MintDto.accAddress,
+        reqDto.accAddress,
         treasuryAddress,
-        treasuryTokenAmount,
+        String(treasuryTokenAmount),
       );
 
-      // const serverAddress = '';
-      const serverTokenAmount = String(Math.round(tokenFee * 0.04));
+      const serverTokenAmount = BigNumber(gameFee)
+        .times(game_digits)
+        .times(0.04);
       const serverTokenExe = await this.cw20Service.transferToken(
         gameTokenContractAddress,
-        gameApiV1MintDto.accAddress,
+        reqDto.accAddress,
         serverAddress,
-        serverTokenAmount,
+        String(serverTokenAmount),
       );
 
-      const fanHolderAddress = betagame.data.fanHolderAddress;
-      const fanHolderAmount = String(Math.round(tokenFee * 0.3));
+      const fanHolderAddress = gameServerData.fanHolderAddress;
+      const fanHolderAmount = BigNumber(gameFee).times(game_digits).times(0.3);
       const fanHolderTokenExe = await this.cw20Service.transferToken(
         gameTokenContractAddress,
-        gameApiV1MintDto.accAddress,
+        reqDto.accAddress,
         fanHolderAddress,
-        fanHolderAmount,
+        String(fanHolderAmount),
       );
 
-      // todo  set tokenId, tokenUrl, extension
-      const nftContractAddress = betagame.data.nftCa;
+      const nftContractAddress = gameServerData.nftContract;
       const mintingExe = await this.cw721Service.mint(
         minterAddress,
         nftContractAddress,
-        gameApiV1MintDto.accAddress,
+        reqDto.accAddress,
         tokenId,
-        '',
-        {},
+        uploadedMetadata.url,
+        uploadedMetadata.extension,
       );
 
-      // todo set memo
-      const memo = String(tokenId) + '-' + gameApiV1MintDto.appId + '-nft';
-
-      // todo: broadcast 시 minter sequence number를 조회하는데 여기서 sequence가 필요한가?
-      const minterSequenceNumber = await this.sequenceUtil.getSequenceNumber(
-        minterAddress,
-      );
-
-      const user = await this.bcClient.account(gameApiV1MintDto.accAddress);
-
-      const mintringFee = await this.lcdClient.tx.estimateFee(
-        [
-          {
-            sequenceNumber: user.sequenceNumber,
-            publicKey: new SimplePublicKey(user.publicKey),
-          },
-          { sequenceNumber: minterSequenceNumber, publicKey: minter.publicKey },
-        ],
+      // fixme: test code
+      const signer = [
         {
-          msgs: [
-            gameProviderC2xExe,
-            treasuryC2xExe,
-            serverC2xExe,
-            c2XHolderC2xExe,
-            minterTokenExe,
-            treasuryTokenExe,
-            serverTokenExe,
-            fanHolderTokenExe,
-            mintingExe,
-          ],
-          memo: memo,
-          gasAdjustment: 1.3,
+          address: minterAddress,
         },
-      );
-      mintringFee.payer = minter.accAddress;
+        {
+          address: reqDto.accAddress,
+        },
+      ];
 
-      const fee = new Fee(
-        mintringFee.gas_limit,
-        mintringFee.amount.toString(),
-        minter.accAddress,
+      const unSignedTx: Tx = await this.commonService.makeTx(signer, [
+        mintingExe,
+        gameProviderC2xExe,
+        treasuryC2xExe,
+        serverC2xExe,
+        c2XHolderC2xExe,
+        minterTokenExe,
+        treasuryTokenExe,
+        serverTokenExe,
+        fanHolderTokenExe,
+      ]);
+
+      const wallet = this.bcClient.wallet(minter.mnemonic);
+      const signTxByMinter = await this.commonService.sign(
+        wallet,
+        unSignedTx,
+        await this.sequenceUtil.getSequenceNumber(minter.address),
       );
-      const tx = await this.bcClient.createTx([], {
-        msgs: [
-          gameProviderC2xExe,
-          treasuryC2xExe,
-          serverC2xExe,
-          c2XHolderC2xExe,
-          minterTokenExe,
-          treasuryTokenExe,
-          serverTokenExe,
-          fanHolderTokenExe,
-          mintingExe,
-        ],
-        memo,
-        fee,
+
+      const encodedUnSignedTx = txEncoding(signTxByMinter);
+
+      await this.txRepo.saveTx(<TransactionEntity>{
+        requestId: requestId,
+        senderAddress: reqDto.accAddress,
+        granterAddress: '',
+        contractAddress: gameServerData.nftContract,
+        txHash: null,
+        tx: encodedUnSignedTx,
+        params: JSON.stringify(reqDto),
+        txType: TxType.MINT,
+        appId: reqDto.appId,
+        playerId: reqDto.playerId,
+        status: TxStatus.WAIT,
+        message: '',
       });
-
-      // todo: save tx info into db
-      // todo: 테이블 구조 협의 필요
-      // await this.gameApiRepository.registerTx(<TransactionEntity>{
-      //   requestId: getNamespace(RequestContext.NAMESPACE).get(
-      //     RequestContext.CORRELATION_ID,
-      //   ),
-      //   // fixme txHash
-      //   txHash: tx.txHash,
-      //   tx: tx,
-      //   status: true,
-      //   appId: gameApiV1MintDto.appId,
-      //   playerId: gameApiV1MintDto.playerId,
-      //   accAddress: gameApiV1MintDto.accAddress,
-      // });
-
-      const unsignedTx = Buffer.from(tx.toBytes()).toString('base64');
 
       return <GameApiV1ResponseMintDto>{
         tokenId: tokenId,
-        unsignedTx: unsignedTx,
-        payerAddress: minter.accAddress,
+        unsignedTx: encodedUnSignedTx,
+        payerAddress: minter.address,
         tokenUri: uploadedMetadata.url,
       };
     } catch (e) {
-      // todo: send exception request to rabbitMQ
+      this.logger.error(e);
       throw new MintException(
         e.message,
         e.stack,
@@ -544,31 +593,32 @@ export class V1MintService {
     }
   }
 
-  async items(gameApiV1MintItemDto: GameApiV1MintItemDto): Promise<GameApiV1ResMintItemDto> {
+  async items(reqDto: GameApiV1MintItemDto): Promise<GameApiV1ResMintItemDto> {
     try {
-      const gameServerData = await this.gameServerData(gameApiV1MintItemDto);
+      const gameServerData = await this.gameServerData(reqDto.appId);
 
       // fixme: use apiLists
       // replyForMint = gameServerInfo.body.data.apiLists.filter(
       //   (item) => item.apiTypeCd === ApiTypeCode.NOTI_OF_COMPLETION_FOR_MINT,
       // )[0];
+      // fixme : category active
       const gameServerApi = gameServerData.apiTestLists.filter(
-        (item) => item.apiTypeCd === this.MINT_LIST_API_TYPE.get(gameApiV1MintItemDto.mintType),
+        (item) => item.apiTypeCd === this.MINT_API_TYPE.get(reqDto.mintType),
       )[0];
 
       // todo: check prams to request
       // call game server to confirm items
       const gameItems = await this.axiosClient.post(gameServerApi.apiUrl, {
-        playerId: gameApiV1MintItemDto.playerId,
-        server: gameApiV1MintItemDto.server,
-        selectedCid: gameApiV1MintItemDto.selectedCid,
-        categoryId: gameApiV1MintItemDto.categoryId,
-        categoryName: gameApiV1MintItemDto.categoryName,
-        categoryType: gameApiV1MintItemDto.categoryType,
+        playerId: reqDto.playerId,
+        server: reqDto.server,
+        selectedCid: reqDto.selectedCid,
+        categoryId: reqDto.categoryId,
+        categoryName: reqDto.categoryName,
+        categoryType: reqDto.categoryType,
       });
       if (!(gameItems.status === 200 || gameItems.status === 201)) {
         throw new GameApiException(
-          'bad request',
+          'failed to respond on game server to get game item',
           '',
           GameApiHttpStatus.BAD_REQUEST,
         );
@@ -576,7 +626,7 @@ export class V1MintService {
 
       let items = [];
       let characters = [];
-      if (gameApiV1MintItemDto.mintType === MintType.ITEM){
+      if (reqDto.mintType === MintType.ITEM) {
         items = gameItems.body.data;
       } else {
         characters = gameItems.body.data;
@@ -584,84 +634,118 @@ export class V1MintService {
 
       return <GameApiV1ResMintItemDto>{
         items: items,
-        characters: characters
+        characters: characters,
       };
     } catch (e) {
       throw new MintException(
         e.message,
         e.stack,
-        MintHttpStatus.SEARCHING_FAILED,
+        MintHttpStatus.ITEM_NOT_FOUND,
       );
     }
   }
 
-  async burnNft() {}
+  async burnNft(
+    reqDto: GameApiV1BurnItemDto,
+  ): Promise<GameApiV1BurnItemResDto> {
+    const requestId = getNamespace(RequestContext.NAMESPACE).get(
+      RequestContext.REQUEST_ID,
+    );
 
-  async broadcast(gameApiV1BroadcastDto: GameApiV1BroadcastDto) {
     try {
-      const txFromDb = await this.gameApiRepository.getTxByRequestId(
-        gameApiV1BroadcastDto.requestId,
+      const gameServerData = await this.gameServerData(reqDto.appId);
+
+      const lockedNft = await this.validateLockNft(
+        gameServerData.nftContract,
+        reqDto.accAddress,
+        [reqDto.tokenId],
       );
-      if (txFromDb === undefined || txFromDb === null) {
+      if (!lockedNft) {
+        throw new MintException(
+          'requested token is not existed!',
+          '',
+          MintHttpStatus.NFT_NOT_EXISTED,
+        );
+      }
+
+      // fixme: change the test code
+      // replyForMint = gameServerInfo.body.data.apiLists.filter(
+      //   (item) => item.apiTypeCd === ApiTypeCode.NOTI_OF_COMPLETION_FOR_MINT,
+      // )[0];
+      const gameServerApi = gameServerData.apiTestLists.filter(
+        (item) => item.apiTypeCd === this.MINT_API_TYPE.get('lock'),
+      )[0];
+
+      const updatedGameItem = await this.axiosClient.post(
+        gameServerApi.apiUrl,
+        {
+          playerId: reqDto.playerId,
+          server: reqDto.server,
+          selectedCid: reqDto.selectedCid,
+          items: [
+            {
+              tokenId: reqDto.tokenId,
+            },
+          ],
+        },
+      );
+
+      if (!(updatedGameItem.status === 200 || updatedGameItem.status === 201)) {
         throw new GameApiException(
-          'error occurred while finding the tx',
+          'failed to respond on game server to update game item',
           '',
           GameApiHttpStatus.BAD_REQUEST,
         );
       }
 
-      // todo: validate tx
-
-      const tx_pb = Tx_pb.decode(
-        Buffer.from(String(gameApiV1BroadcastDto.signedTx), 'base64'),
-      );
-      const tx = Tx.fromProto(tx_pb);
-      // todo: get fee payer key
-      const feePayer = await getMinterKey();
-
-      const sequenceNumber = await this.sequenceUtil.getSequenceNumber(
-        feePayer.accAddress,
+      const msg = await this.cw721Service.burn(
+        reqDto.accAddress,
+        gameServerData.nftContract,
+        reqDto.tokenId,
       );
 
-      const feePayerWallet = this.lcdClient.wallet(feePayer);
+      const signer = [{ address: reqDto.accAddress }];
+      const unSignedTx = await this.commonService.makeTx(signer, [msg]);
+      const encodedUnSignedTx = txEncoding(unSignedTx);
 
-      //fixme : minter의 경우 sequence를 이미 증가 시킴, 또다시 증가 필요?
-      const account = await this.bcClient.account(
-        gameApiV1BroadcastDto.feePayerAddress,
-      );
-      // const signOption: SignOptions = {
-      //     chainID,
-      //     accountNumber: account.account_number,
-      //     sequence: sequenceNumber,
-      //     signMode: SignMode.SIGN_MODE_LEGACY_AMINO_JSON
-      // }
+      await this.txRepo.saveTx(<TransactionEntity>{
+        requestId: requestId,
+        senderAddress: reqDto.accAddress,
+        // granterAddress: '',
+        contractAddress: gameServerData.nftContract,
+        // txHash: null,
+        tx: encodedUnSignedTx,
+        params: JSON.stringify(reqDto),
+        txType: TxType.MINT,
+        appId: reqDto.appId,
+        playerId: reqDto.playerId,
+        status: TxStatus.WAIT,
+        // message: ''
+      });
 
-      await this.commonService.sign(feePayerWallet, tx);
-
-      // todo: save signed tx
+      return <GameApiV1BurnItemResDto>{
+        unsignedTx: encodedUnSignedTx,
+        requestId: requestId,
+      };
     } catch (e) {
-      // todo: handling error
-      throw new GameApiException(
+      this.logger.error(e);
+      throw new MintException(
         e.message,
         e.stack,
-        GameApiHttpStatus.INTERNAL_SERVER_ERROR,
+        MintHttpStatus.BURN_FAILED,
       );
     }
   }
 
-  private async gameServerData(
-    gameApiV1MintDto: GameApiV1MintItemDto | GameApiV1ValidItemDto,
-  ): Promise<any> {
+  private async gameServerData(appId: string): Promise<any> {
     const gameServerData = await this.axiosClient.get(
-      this.configService
-        .get('BG_DETAIL_GAME_INFO')
-        .replace('{APP_ID}', gameApiV1MintDto.appId),
+      this.configService.get('BG_DETAIL_GAME_INFO').replace('{APP_ID}', appId),
     );
     if (gameServerData.status !== 200) {
       throw new GameApiException(
-        'bad request',
+        'failed to respond on console server',
         '',
-        GameApiHttpStatus.BAD_REQUEST,
+        GameApiHttpStatus.EXTERNAL_SERVER_ERROR,
       );
     }
     if (gameServerData.body.code === 404) {
@@ -672,5 +756,46 @@ export class V1MintService {
       );
     }
     return gameServerData.body.data;
+  }
+
+  private async validateLockNft(
+    nftContract: string,
+    accAddress: string,
+    tokens: string[],
+  ): Promise<boolean> {
+    const lockedNft =
+      (await this.lockService.lockNftList(nftContract, accAddress)) ?? false;
+    let matchedToken = [];
+    if (lockedNft && lockedNft.length > 0) {
+      matchedToken = tokens.filter((t) => lockedNft.tokens.includes(t));
+    }
+    this.logger.debug(lockedNft);
+    this.logger.debug(matchedToken);
+    if (matchedToken.length > 0) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  async testNft(testDto: TestDto): Promise<string> {
+    const user = {
+      address: testDto.address,
+      mnemonic: testDto.mnemonic,
+    };
+
+    const encodedUnSignedTx = txDecoding(testDto.unsignedTx);
+
+    const wallet = this.bcClient.wallet(user.mnemonic);
+
+    console.log('>>>>>>>>>>>> ', await wallet.sequence());
+
+    const signTx = await this.commonService.sign(
+      wallet,
+      encodedUnSignedTx,
+      await wallet.sequence(),
+    );
+    const txHash = await this.commonService.broadcast(signTx);
+    return txHash;
   }
 }

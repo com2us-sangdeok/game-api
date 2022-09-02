@@ -11,6 +11,12 @@ export class ConvertRepository {
   ) {}
 
   public async saveTx(tx: TransactionEntity) {
-    return await this.txRepo.save(tx);
+    try {
+      return await this.txRepo.save(tx);
+    } catch (err) {
+      console.log('&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&');
+      console.log(err);
+      console.log('&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&');
+    }
   }
 }

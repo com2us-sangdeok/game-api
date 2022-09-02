@@ -1,4 +1,4 @@
-// import { Module } from '@nestjs/common';
+// import { Module } from '@nestjs/broadcast';
 // import { gameApiProviders } from './../game-api.providers';
 // import { GameApiV2Service } from './game-api-v2.service';
 // import { GameApiV2Controller } from './game-api-v2.controller';

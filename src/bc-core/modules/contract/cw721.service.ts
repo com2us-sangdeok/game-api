@@ -43,28 +43,49 @@ export class CW721Service {
     } catch (err) {
       throw new BlockchainException(
         err.message,
-        err?.code,
+        err.response?.data,
         BlockchainStatus.NFT_MINT_ERROR,
       );
     }
   }
 
   // TODO 추가 예정
-  public async burn(): Promise<any> {}
-
-  //nft List 조회
-  public async nftList(
+  public async burn(
+    nftOwner: string,
     nftContract: string,
-    address: string,
-  ): Promise<string[]> {
+    tokenId: string,
+  ): Promise<any> {
     try {
-      return await this.bc.client.contractQuery(nftContract, {
-        tokens: { owner: address },
+      return new MsgExecuteContract(nftOwner, nftContract, {
+        burn: {
+          token_id: tokenId,
+        },
       });
     } catch (err) {
       throw new BlockchainException(
         err.message,
         err?.code,
+        BlockchainStatus.NFT_BURN_ERROR,
+      );
+    }
+  }
+
+  //nft List 조회
+  public async nftList(
+    nftContract: string,
+    address: string,
+  ): Promise<{ tokens: string[] }> {
+    try {
+      return await this.bc.client.contractQuery(nftContract, {
+        tokens: { owner: address },
+      });
+    } catch (err) {
+      console.log('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@');
+      console.log(err.response.data);
+      console.log('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@');
+      throw new BlockchainException(
+        err.message,
+        err.response?.data,
         BlockchainStatus.GET_NFT_LIST_ERROR,
       );
     }
@@ -82,7 +103,7 @@ export class CW721Service {
     } catch (err) {
       throw new BlockchainException(
         err.message,
-        err?.code,
+        err.response?.data,
         BlockchainStatus.GET_NFT_DETAIL_ERROR,
       );
     }
@@ -107,7 +128,7 @@ export class CW721Service {
     } catch (err) {
       throw new BlockchainException(
         err.message,
-        err?.code,
+        err.response?.data,
         BlockchainStatus.NFT_TRANSFER_ERROR,
       );
     }
@@ -135,7 +156,7 @@ export class CW721Service {
     } catch (err) {
       throw new BlockchainException(
         err.message,
-        err?.code,
+        err.response?.data,
         BlockchainStatus.NFT_SEND_ERROR,
       );
     }

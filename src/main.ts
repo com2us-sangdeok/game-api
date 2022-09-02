@@ -1,4 +1,4 @@
-import { NestFactory } from '@nestjs/core';
+import {NestFactory} from '@nestjs/core';
 import { AppModule } from './app.module';
 import {ValidationPipe, VERSION_NEUTRAL, VersioningType} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -7,7 +7,6 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import {getLogFormat, logLevel} from './commom/logger/winston.config';
 import * as winston from 'winston';
 import {HttpExceptionFilter} from "./filter/http-exception.filter";
-// import {winstonLogger} from "./logger/logger.module";
 /*
   todo:
     Security (auth)
@@ -37,6 +36,7 @@ async function bootstrap() {
         }),
     );
 
+    app.setGlobalPrefix(configService.get('SWAGGER_PREFIX'))
     app.enableVersioning({
       type: VersioningType.URI,
       //fixme: default 설정으로 모든 contoller 버전 컨트롤

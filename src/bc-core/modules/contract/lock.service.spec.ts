@@ -158,7 +158,12 @@ describe('LockService', () => {
     });
 
     it('create unlock msg', async () => {
-      unlockMsg = await lockService.unLock(lockContract, nftContract, tokenId);
+      unlockMsg = await lockService.unLock(
+        lockContract,
+        nftContract,
+        tokenId,
+        '',
+      );
       expect(unlockMsg).not.toBeNull();
       console.log('unlockMsg', unlockMsg);
     });

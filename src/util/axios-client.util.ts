@@ -19,7 +19,7 @@ export class AxiosClientUtil {
     url: string,
     headerOpts?: any,
   ): Promise<AxiosResponseDto<any>> {
-    let headers = this.setHeaderData(headerOpts);
+    const headers = this.setHeaderData(headerOpts);
     try {
       const response = await firstValueFrom(
         this.httpService.get(url, { headers: headers }),
@@ -32,7 +32,7 @@ export class AxiosClientUtil {
   }
 
   public async post(url: string, data?: any, headerOpts?: any): Promise<any> {
-    let headers = this.setHeaderData(headerOpts);
+    const headers = this.setHeaderData(headerOpts);
     try {
       const response = await firstValueFrom(
         this.httpService.post(url, data, { headers: headers }),

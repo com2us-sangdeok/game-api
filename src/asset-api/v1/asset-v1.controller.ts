@@ -46,7 +46,7 @@ export class AssetV1Controller {
     }
   }
 
-  @Post('asset-api-by-url')
+  @Post('asset-by-url')
   @ApiOperation({ summary: 'upload asset-api by public url' })
   async uploadImageByUrl(
     @Body() assetDto: AssetDto,
@@ -59,7 +59,7 @@ export class AssetV1Controller {
     );
   }
 
-  @Get('asset-api/:assetName')
+  @Get('asset/:assetName')
   @ApiOperation({ summary: 'get asset-api info' })
   async getImageByName(
     @Param('assetName') assetName: string,

@@ -1,12 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, QueryRunner } from 'typeorm';
-import {GameApiException, GameApiHttpStatus} from "../exception/request.exception";
-import {BlockchainService} from "../bc-core/blockchain/blockchain.service";
-import {SequenceRepository} from "./repository/sequence.repository";
+import {
+  GameApiException,
+  GameApiHttpStatus,
+} from '../exception/request.exception';
+import { BlockchainService } from '../bc-core/blockchain/blockchain.service';
+import { SequenceRepository } from './repository/sequence.repository';
 
 @Injectable()
 export class SequenceUtil {
-
   constructor(
     private readonly blockchainService: BlockchainService,
     private dataSource: DataSource,
@@ -51,7 +53,7 @@ export class SequenceUtil {
         queryRunner,
         accAddress,
       );
-      nextSequenceNumber = Number(sequenceFromDB)+1;
+      nextSequenceNumber = Number(sequenceFromDB);
       await queryRunner.commitTransaction();
       return nextSequenceNumber;
     } catch (e) {

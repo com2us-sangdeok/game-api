@@ -1,13 +1,13 @@
-import { HttpException } from '@nestjs/common';
+import {ServerException} from "./server.exception";
 
-export class BlockchainException extends HttpException {
+export class BlockchainException extends ServerException {
   constructor(message: any, error: any = '', statusCode: BlockchainStatus = 0) {
-    super(HttpException.createBody(message, error, statusCode), statusCode);
+    super(ServerException.createBody(message, error, statusCode), statusCode);
   }
 }
 
 export enum BlockchainStatus {
-  TRANSACTION_FAILED = 900,
+  TRANSACTION_FAILED = 9000,
   BROADCASTING_FAILED,
   INVALID_ADDRESS,
   CREATE_TX_ERROR,
@@ -18,6 +18,7 @@ export enum BlockchainStatus {
   TRANSFER_TOKEN_ERROR,
   //nft
   NFT_MINT_ERROR,
+  NFT_BURN_ERROR,
   GET_NFT_LIST_ERROR,
   GET_NFT_DETAIL_ERROR,
   NFT_TRANSFER_ERROR,
@@ -27,4 +28,7 @@ export enum BlockchainStatus {
   NFT_UNLOCK_ERROR,
   NFT_INLOCK_SIGN_ERROR,
   NFT_LOCK_LIST_ERROR,
+
+  //broadcast
+  BROADCAST_ERROR = 999,
 }

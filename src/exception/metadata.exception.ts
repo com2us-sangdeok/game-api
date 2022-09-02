@@ -1,12 +1,12 @@
-import { HttpException } from '@nestjs/common';
+import {ServerException} from "./server.exception";
 
-export class MetadataException extends HttpException {
+export class MetadataException extends ServerException {
   constructor(message: any, error: any, statusCode: MetadataHttpStatus) {
-    super(HttpException.createBody(message, error, statusCode), statusCode);
+    super(ServerException.createBody(message, error, statusCode), statusCode);
   }
 }
 
 export enum MetadataHttpStatus {
-  METADATA_UPLOAD_FAILED = 990,
+  METADATA_UPLOAD_FAILED = 5200,
   SEARCHING_FAILED
 }

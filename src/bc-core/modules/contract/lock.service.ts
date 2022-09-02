@@ -66,7 +66,7 @@ export class LockService {
     } catch (err) {
       throw new BlockchainException(
         err.message,
-        err?.code,
+        err.response?.data,
         BlockchainStatus.NFT_LOCK_ERROR,
       );
     }
@@ -76,6 +76,7 @@ export class LockService {
     lockContract: string,
     nftContract: string,
     tokenId: string,
+    address: string,
   ): Promise<MsgExecuteContract> {
     try {
       const executeMsg = {
@@ -85,13 +86,13 @@ export class LockService {
         },
       };
 
-      return new MsgExecuteContract(this.lockOwner.address, lockContract, {
+      return new MsgExecuteContract(address, lockContract, {
         ...executeMsg,
       });
     } catch (err) {
       throw new BlockchainException(
         err.message,
-        err?.code,
+        err.response?.data,
         BlockchainStatus.NFT_UNLOCK_ERROR,
       );
     }
@@ -107,7 +108,7 @@ export class LockService {
     } catch (err) {
       throw new BlockchainException(
         err.message,
-        err?.code,
+        err.response?.data,
         BlockchainStatus.NFT_INLOCK_SIGN_ERROR,
       );
     }
@@ -124,7 +125,7 @@ export class LockService {
     } catch (err) {
       throw new BlockchainException(
         err.message,
-        err?.code,
+        err.response?.data,
         BlockchainStatus.NFT_LOCK_LIST_ERROR,
       );
     }

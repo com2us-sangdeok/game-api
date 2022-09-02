@@ -28,7 +28,7 @@ export class MetadataV1Controller {
     );
   }
 
-  @Get('metadata-api/:id')
+  @Get('metadata/:id')
   @ApiOperation({ summary: 'get metadata-api' })
   async getMetadata(
     @Param('id') id: string,

@@ -24,7 +24,7 @@ import { V1LockService } from './v1/lock/v1.lock.service';
 import {
   ConvertPoolEntity,
   TransactionEntity,
-  NonFungibleTokenEntity,
+  TokenIdEntity,
   MintLogEntity,
   SequenceEntity,
 } from '../entities';
@@ -32,9 +32,9 @@ import {MetadataModule} from "../metadata-api/metadata.module";
 import { SequenceRepository } from '../util/repository/sequence.repository';
 import { SequenceUtil } from '../util/sequence.util';
 import { ConvertRepository } from './v1/repository/convert.repository';
-import {V1ConsoleController} from "./v1/console/v1.console.controller";
-import {V1ConsoleService} from "./v1/console/v1.console.service";
-import {ConsoleRepository} from "./v1/repository/console.repository";
+import { TransactionRepository } from './v1/repository/transaction.repository';
+import { V1BroadcastController } from './v1/broadcast/v1.broadcast.controller';
+import { V1BroadcastService } from './v1/broadcast/v1.broadcast.service';
 
 @Module({
   imports: [
@@ -42,7 +42,7 @@ import {ConsoleRepository} from "./v1/repository/console.repository";
     TypeOrmModule.forFeature([
       ConvertPoolEntity,
       TransactionEntity,
-      NonFungibleTokenEntity,
+      TokenIdEntity,
       MintLogEntity,
       SequenceEntity,
     ]),
@@ -59,7 +59,7 @@ import {ConsoleRepository} from "./v1/repository/console.repository";
     MetadataModule,
     BcCoreModule,
   ],
-  controllers: [V1MintController, V1ConvertController, V1LockController, V1ConsoleController],
+  controllers: [V1MintController, V1ConvertController, V1LockController],
   providers: [
     ...coreProviders,
     BlockchainService,
@@ -71,13 +71,13 @@ import {ConsoleRepository} from "./v1/repository/console.repository";
     V1MintService,
     V1ConvertService,
     V1LockService,
+    V1BroadcastService,
     AxiosClientUtil,
     MintRepository,
     SequenceRepository,
     SequenceUtil,
     ConvertRepository,
-    V1ConsoleService,
-    ConsoleRepository,
+    TransactionRepository,
   ],
 })
 export class GameApiModule {}
