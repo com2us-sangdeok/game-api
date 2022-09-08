@@ -1,4 +1,5 @@
 import {
+  ApiHeaderOptions,
   ApiProperty,
   IntersectionType,
   PartialType,
@@ -14,23 +15,23 @@ import {
 import { ExtensionDto } from '../../../metadata-api/v1/dto/metadata-v1.dto';
 import { MintType } from '../../../enum';
 
-export class GameApiV1ConvertPoolDto {
-  @ApiProperty({ example: 'afkraid', description: 'game app name' })
-  @IsString()
-  appName: string;
-
-  @ApiProperty({ example: 100, description: 'lower game currency' })
-  lowerGameCurrency: number;
-
-  @ApiProperty({ example: 0, description: 'game token' })
-  gameToken: number;
-
-  @ApiProperty({ example: 100, description: 'upper game currency' })
-  upperGameCurrency: number;
-
-  @ApiProperty({ example: 0, description: 'c2x' })
-  ctx: number;
-}
+export const headerParams = [
+  {
+    name: 'appid',
+    example: 'com.com2us.testgame.global.normal',
+    description: 'APP ID',
+  },
+  {
+    name: 'server', // todo: server 정보 입력? string ex> 1,1,1
+    example: '1,1,1',
+    description: 'Server Information',
+  },
+  {
+    name: 'pid',
+    example: '111',
+    description: 'Player ID',
+  },
+];
 
 export class GameApiV1ImageUrlAndMintingFeeCodeDto {
   // @ApiProperty({
@@ -87,7 +88,7 @@ export class GameApiV1defaultDto {
   gameIndex: number;
 
   @ApiProperty({
-    example: 'com.com2us.c2xwallet.global.normal',
+    example: 'com.com2us.testgame.global.normal',
     description: 'App ID',
   })
   @IsString()
@@ -102,23 +103,30 @@ export class GameApiV1defaultDto {
     description: 'selected character ID',
   })
   @IsString()
-  selectedCid: string;
+  characterId: string;
 
-  @ApiProperty({ example: 13453245, description: 'Player ID' })
+  @ApiProperty({ example: 135, description: 'Player ID' })
   @IsNumber()
   playerId: number;
 }
 
-export class GameApiV1ValidItemDto extends GameApiV1defaultDto {
+export class GameApiV1ValidItemDto /*extends GameApiV1defaultDto*/ {
   @ApiProperty({
-    example: 'xpla16v6y48xllwy7amcmvhkv0a3zp7jepl44yvhvxt',
+    example: 'xpla1h086yrxdzhgqzftk2hzcgst9gywttqd2d32g6q',
     description: 'User Address',
   })
   @IsString()
   accAddress: string;
 
   @ApiProperty({
-    example: MintType.ITEM,
+    example: 'com2us',
+    description: 'selected character ID',
+  })
+  @IsString()
+  characterId?: string;
+
+  @ApiProperty({
+    example: MintType.ITEMS,
     description: 'minting type {item, items, character}',
   })
   @IsString()
@@ -141,13 +149,20 @@ export class GameApiV1ValidItemDto extends GameApiV1defaultDto {
   tokens: GameApiV1MintingTokenDto[];
 }
 
-export class GameApiV1MintDto extends GameApiV1defaultDto {
+export class GameApiV1MintDto /*extends GameApiV1defaultDto*/ {
   @ApiProperty({
     example: 'xpla1my0sjrk4aysgqd42gre4m7ktmf20law6462h45',
     description: 'User Address',
   })
   @IsString()
   accAddress: string;
+
+  @ApiProperty({
+    example: 'com2us',
+    description: 'selected character ID',
+  })
+  @IsString()
+  characterId: string;
 
   @ApiProperty({
     example: MintType.ITEM,
@@ -168,13 +183,16 @@ export class GameApiV1MintDto extends GameApiV1defaultDto {
     description: 'valid item/character id for minting',
   })
   @IsString()
-  id: string;
+  id?: string;
 
   @ApiProperty({ example: '0.130000000000000000', description: 'xpla fee' })
   @IsString()
   serviceFee: string;
 
-  @ApiProperty({ example: '0.130000000000000000', description: 'game token fee' })
+  @ApiProperty({
+    example: '0.130000000000000000',
+    description: 'game token fee',
+  })
   @IsString()
   gameFee: string;
 
@@ -188,6 +206,11 @@ export class GameApiV1MintDto extends GameApiV1defaultDto {
 export class GameApiV1CalculateMintingFeeDto {
   serviceFee: string;
   gameFee: string;
+}
+
+export class GameApiV1CalculateMintingDataDto extends GameApiV1CalculateMintingFeeDto {
+  items?: string[];
+  tokens?: string[];
 }
 
 export class GameApiV1ResponseValidItemDto extends GameApiV1CalculateMintingFeeDto {
@@ -251,29 +274,11 @@ export class GameApiV1MintItemDto {
   mintType: MintType;
 
   @ApiProperty({
-    example: 'com.com2us.c2xwallet.global.normal',
-    description: 'app ID',
-  })
-  @IsString()
-  appId: string;
-
-  @ApiProperty({ example: 1, description: 'player id' })
-  @IsNumber()
-  playerId: number;
-
-  @ApiProperty({
-    example: ['1', '1'],
-    description: 'server id',
-  })
-  @IsArray()
-  server: string[];
-
-  @ApiProperty({
     example: 'characterId',
     description: 'selected character ID',
   })
   @IsString()
-  selectedCid: string;
+  characterId: string;
 
   @ApiProperty({ example: 1, description: 'category id' })
   @IsNumber()
@@ -299,13 +304,15 @@ export class GameApiV1ResponseMintItemDto {
 
 export class GameApiV1ResMintItemDto {
   @ApiProperty({
-    example: [{
-      name: 'sword2',
-      description: 'sword1 description',
-      uniqueId: 'itemUniqCode2',
-      nftStatus: 3,
-      tokenId: 'tokenId',
-    }],
+    example: [
+      {
+        name: 'sword2',
+        description: 'sword1 description',
+        uniqueId: 'itemUniqCode2',
+        nftStatus: 3,
+        tokenId: 'tokenId',
+      },
+    ],
     description: 'game item list',
   })
   items: [];
@@ -327,6 +334,19 @@ export class GameApiV1ResMintItemDto {
 }
 
 export class GameApiV1BurnItemDto extends GameApiV1defaultDto {
+  characterId: string;
+  tokenId: string;
+  accAddress: string;
+}
+
+export class GameApiV1BurnItemReqDto /*extends GameApiV1defaultDto*/ {
+  @ApiProperty({
+    example: 'com2us',
+    description: 'selected character ID',
+  })
+  @IsString()
+  characterId: string;
+
   @ApiProperty({
     example: 'MintuniqCode1',
     description: 'nft id',
@@ -356,7 +376,6 @@ export class GameApiV1BurnItemResDto {
   requestId: string;
 }
 
-
 export class TestDto {
   @ApiProperty({
     example: '31CF564675A78B54C4F054B6F98F5DF2ABD54C088A88E42...',
@@ -366,14 +385,15 @@ export class TestDto {
   unsignedTx: string;
 
   @ApiProperty({
-    example: 'xpla16v6y48xllwy7amcmvhkv0a3zp7jepl44yvhvxt',
+    example: 'xpla1my0sjrk4aysgqd42gre4m7ktmf20law6462h45',
     description: 'user address',
   })
   @IsString()
-  address: string
+  address: string;
 
   @ApiProperty({
-    example: 'elite leaf army replace floor coral same elegant river gather water basic fun sing odor flight roof umbrella truck claw priority guide february conduct',
+    example:
+      'elite leaf army replace floor coral same elegant river gather water basic fun sing odor flight roof umbrella truck claw priority guide february conduct',
     description: 'user mnemonic',
   })
   @IsString()

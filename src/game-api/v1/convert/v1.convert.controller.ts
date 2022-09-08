@@ -59,15 +59,6 @@ export class V1ConvertController {
     } else {
       result = await this.v1ConvertService.convertToCurrency(body);
     }
-    // if (
-    //   body.convertTypeCd !== CommonCode.CONVERT_COIN_GAME &&
-    //   body.convertTypeCd !== CommonCode.CONVERT_TOKEN_GAME
-    // ) {
-    //   data = 'convertTypeCode is not matched';
-    // } else {
-    //   const result = await this.v1ConvertService.convertToCurrency(body);
-    //   //유저 sign후 broadcast시 필수값
-    // }
 
     return new CommonResponseDto(GameApiHttpStatus.OK, 'success', result);
   }
@@ -84,20 +75,6 @@ export class V1ConvertController {
     @Body() body: V1ConvertToTokenInputDto,
   ): Promise<CommonResponseDto<any>> {
     const result = await this.v1ConvertService.convertToToken(body);
-    return new CommonResponseDto(GameApiHttpStatus.OK, 'success', result);
-  }
-
-  //TODO 테스트로 만듬 추후 통합 예정
-  @Post('/convert/broadcast')
-  @ApiOperation({ summary: 'Convert Game Currency to Game Token ' })
-  @ApiResponse({
-    status: 200,
-    description: '',
-    type: V1ConvertBroadcast,
-  })
-  @ApiResponse({ status: 403, description: 'Forbidden.' })
-  async broadcast(@Body() body: V1ConvertBroadcast): Promise<any> {
-    const result = await this.v1ConvertService.convertBroadcast(body);
     return new CommonResponseDto(GameApiHttpStatus.OK, 'success', result);
   }
 }

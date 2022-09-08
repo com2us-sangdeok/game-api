@@ -4,6 +4,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   PrimaryColumn,
+  PrimaryGeneratedColumn,
   Index,
 } from 'typeorm';
 import { TxType } from '../enum';
@@ -15,6 +16,9 @@ export class TransactionEntity {
     Object.assign(this, options);
   }
 
+  @PrimaryGeneratedColumn('increment')
+  id: number;
+
   @PrimaryColumn({ type: 'varchar', primary: true })
   @Index('idx-requestId')
   requestId: string;
@@ -22,11 +26,6 @@ export class TransactionEntity {
   @Column({ type: 'varchar', length: 100, nullable: true, default: null })
   @Index('idx-sender')
   senderAddress: string;
-
-  //TODO. minterAddress로 바뀔수도 있음
-  @Column({ type: 'varchar', length: 100, nullable: true, default: null })
-  @Index('idx-granter')
-  granterAddress?: string;
 
   @Column({ type: 'varchar', length: 100, nullable: true, default: null })
   @Index('idx-contract')

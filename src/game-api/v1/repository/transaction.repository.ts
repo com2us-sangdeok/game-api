@@ -33,6 +33,7 @@ export class TransactionRepository {
     requestId: string,
     status: TxStatus,
     tx?: string,
+    txHash?: string,
   ): Promise<any> {
     return await queryRunner.manager
       .getRepository(TransactionEntity)
@@ -41,7 +42,7 @@ export class TransactionRepository {
       .setLock('pessimistic_read')
       .setLock('pessimistic_write')
       .update(TransactionEntity)
-      .set({ status: status })
+      .set({ status: status, tx: tx, txHash: txHash })
       .where('requestId = :requestId', { requestId: requestId })
       .execute();
   }

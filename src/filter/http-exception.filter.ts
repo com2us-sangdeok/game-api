@@ -6,7 +6,6 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
-import { HttpAdapterHost } from '@nestjs/core';
 import { ServerException } from '../exception/server.exception';
 
 @Catch()
@@ -21,9 +20,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const httpStatus =
       exception instanceof ServerException
         ? HttpStatus.INTERNAL_SERVER_ERROR
-        : exception.getStatus();
+        : exception.getStatus() ?? 500;
 
-    const code = exception.getStatus
+    const code = exception.getStatus()
       ? exception.getStatus()
       : HttpStatus.INTERNAL_SERVER_ERROR;
 

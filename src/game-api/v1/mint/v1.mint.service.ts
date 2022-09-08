@@ -1,7 +1,11 @@
-import {HttpException, HttpStatus, Inject, Injectable, LoggerService} from '@nestjs/common';
 import {
-  GameApiV1BurnItemDto,
-  GameApiV1BurnItemResDto,
+  Inject,
+  Injectable,
+  LoggerService,
+} from '@nestjs/common';
+import {
+  GameApiV1BurnItemDto, GameApiV1BurnItemReqDto,
+  GameApiV1BurnItemResDto, GameApiV1CalculateMintingDataDto,
   GameApiV1CalculateMintingFeeDto,
   GameApiV1MintDto,
   GameApiV1MintItemDto,
@@ -32,7 +36,6 @@ import {
 } from '../../../entities';
 import { getNamespace } from 'cls-hooked';
 import { RequestContext } from '../../../commom/context/request.context';
-import { compareObject } from '../../../util/common.util';
 import { Tx } from '@xpla/xpla.js/dist/core';
 import { SequenceUtil } from '../../../util/sequence.util';
 import { MetadataV1Service } from '../../../metadata-api/v1/metadata-v1.service';
@@ -45,6 +48,8 @@ import { MintType, TxStatus, TxType } from '../../../enum';
 import { txDecoding, txEncoding } from '../../../util/encoding';
 import BigNumber from 'bignumber.js';
 import { TransactionRepository } from '../repository/transaction.repository';
+
+const Diff = require('diff');
 
 @Injectable()
 export class V1MintService {
@@ -62,7 +67,7 @@ export class V1MintService {
       item: GameServerApiCode.MINT_ITEM_LIST,
       character: GameServerApiCode.MINT_CHARACTER_LIST,
       mint: GameServerApiCode.MINT,
-      lock: GameServerApiCode.LOCK_ITEM_NFT,
+      lock: GameServerApiCode.LOCK_NFT,
       // lock: GameServerApiCode.LOCK_CHARACTER_NFT,
     }),
   );
@@ -89,36 +94,33 @@ export class V1MintService {
   ) {}
 
   async confirmItems(
-    reqDto: GameApiV1ValidItemDto,
+    reqDto: any,
   ): Promise<GameApiV1ResponseValidItemDto> {
+
     const requestId = getNamespace(RequestContext.NAMESPACE).get(
       RequestContext.REQUEST_ID,
     );
 
     try {
       const gameServerData = await this.gameServerData(reqDto.appId);
-
-      // fixme: change the test code
-      // replyForMint = gameServerInfo.body.data.apiLists.filter(
-      //   (item) => item.apiTypeCd === ApiTypeCode.NOTI_OF_COMPLETION_FOR_MINT,
-      // )[0];
-      const gameServerApi = gameServerData.apiTestLists.filter(
-        (item) => item.apiTypeCd === GameServerApiCode.CONFIRM_MINTING,
+      const gameServerApi = gameServerData.apiLists.filter(
+        (item) => item.apiTypeCd === GameServerApiCode.MINT_CONFIRM,
       )[0];
 
-      const mintingFee = await this.calculateMintingFee(reqDto, gameServerData);
+      const mintingData = await this.calculateMintingFee(reqDto, gameServerData);
 
       // call game server to confirm items
-      const confirmedItem = await this.axiosClient.post(
-        gameServerApi.apiUrl,
+      const queryString =
+          `?cid=${reqDto.characterId}
+          &type=${reqDto.mintType}
+          &items=${mintingData.items.join()}
+          &tokenId=${mintingData.tokens.join()}`;
+      const confirmedItem = await this.axiosClient.get(
+        gameServerApi.apiUrl + queryString,
         {
-          playerId: reqDto.playerId,
+          appid: reqDto.appId,
           server: reqDto.server,
-          selectedCid: reqDto.selectedCid,
-          items: reqDto.items,
-        },
-        {
-          correlationId: requestId,
+          pid: reqDto.playerId,
         },
       );
       if (!(confirmedItem.status === 200 || confirmedItem.status === 201)) {
@@ -137,13 +139,14 @@ export class V1MintService {
         accAddress: reqDto.accAddress,
         appId: reqDto.appId,
         id: confirmedItem.body.data.uniqueId,
-        serviceFee: mintingFee.serviceFee,
-        gameFee: mintingFee.gameFee,
+        metadata: confirmedItem.body.data.extension,
+        serviceFee: mintingData.serviceFee,
+        gameFee: mintingData.gameFee,
       });
 
       return <GameApiV1ResponseValidItemDto>{
-        serviceFee: mintingFee.serviceFee,
-        gameFee: mintingFee.gameFee,
+        serviceFee: mintingData.serviceFee,
+        gameFee: mintingData.gameFee,
         metadata: confirmedItem.body.data.extension,
         requestId: requestId,
         id: confirmedItem.body.data.uniqueId,
@@ -158,11 +161,11 @@ export class V1MintService {
   }
 
   private async calculateMintingFee(
-    gameApiV1ValidItemDto: GameApiV1ValidItemDto,
+    reqDto: GameApiV1ValidItemDto,
     gameServer: any,
-  ): Promise<GameApiV1CalculateMintingFeeDto> {
-    const tokenData = gameApiV1ValidItemDto.tokens ?? false;
-    const itemData = gameApiV1ValidItemDto.items ?? false;
+  ): Promise<GameApiV1CalculateMintingDataDto> {
+    const tokenData = reqDto.tokens ?? false;
+    const itemData = reqDto.items ?? false;
 
     // fixme: 조건 정리
     //  1.token or item
@@ -176,14 +179,14 @@ export class V1MintService {
         GameApiHttpStatus.BAD_REQUEST,
       );
     } else if (tokenData && itemData) {
-      if (gameApiV1ValidItemDto.mintType !== 'items') {
+      if (reqDto.mintType !== 'items') {
         throw new GameApiException(
           'token and item requested!',
           '',
           GameApiHttpStatus.BAD_REQUEST,
         );
       }
-    } else if (tokenData && gameApiV1ValidItemDto.mintType !== 'items') {
+    } else if (tokenData && reqDto.mintType !== 'items') {
       if (tokenData.length > 1) {
         throw new GameApiException(
           'more than one token requested!',
@@ -191,7 +194,7 @@ export class V1MintService {
           GameApiHttpStatus.BAD_REQUEST,
         );
       }
-    } else if (itemData && gameApiV1ValidItemDto.mintType !== 'items') {
+    } else if (itemData && reqDto.mintType !== 'items') {
       if (itemData.length > 1) {
         throw new GameApiException(
           'more than one item requested!',
@@ -201,15 +204,21 @@ export class V1MintService {
       }
     }
 
+    let requestedItems = [];
+    if (itemData && itemData.length > 0) {
+      reqDto.items.forEach((i) => {
+        requestedItems.push(i.uniqueId)
+      })
+    }
     // validate locked nft
+    let requestedTokens = [];
     if (tokenData && tokenData.length > 0) {
-      let requestedTokens = [];
-      gameApiV1ValidItemDto.tokens.forEach((token) => {
-        requestedTokens.push(token.tokenId);
+      reqDto.tokens.forEach((t) => {
+        requestedTokens.push(t.tokenId);
       });
       const lockedNft = await this.validateLockNft(
         gameServer.nftContract,
-        gameApiV1ValidItemDto.accAddress,
+          reqDto.accAddress,
         requestedTokens,
       );
       if (lockedNft) {
@@ -226,7 +235,7 @@ export class V1MintService {
       gameServer.categoryLists.filter(
         (item) =>
           item.mintTypeCd ===
-            this.CATEGORY_MINT_TYPE.get(gameApiV1ValidItemDto.mintType) &&
+            this.CATEGORY_MINT_TYPE.get(reqDto.mintType) &&
           item.activeTypeCd === GameCategory.ACTIVE,
       )[0] ?? false;
     if (!category) {
@@ -241,7 +250,7 @@ export class V1MintService {
     let serviceFee = new BigNumber(0);
     let gameFee = new BigNumber(0);
     const digits = BigNumber(10 ** this.BC_DECIMAL);
-    switch (gameApiV1ValidItemDto.mintType) {
+    switch (reqDto.mintType) {
       case 'item' || 'character':
         serviceFee = BigNumber(category.feeInfo[0].xplaFee).times(digits);
         gameFee = BigNumber(category.feeInfo[0].gameTokenFee).times(digits);
@@ -250,7 +259,7 @@ export class V1MintService {
         const feeLIst = category.feeInfo;
 
         if (itemData && itemData.length > 0) {
-          gameApiV1ValidItemDto.items.forEach(function (gameItem) {
+          reqDto.items.forEach(function (gameItem) {
             const mintingFee = feeLIst.filter(
               (feeInfo) => feeInfo.mintCount === gameItem.mintingFeeCode,
             )[0];
@@ -265,7 +274,7 @@ export class V1MintService {
         }
 
         if (tokenData && tokenData.length > 0) {
-          gameApiV1ValidItemDto.tokens.forEach(function (gameItem) {
+          reqDto.tokens.forEach(function (gameItem) {
             const mintingFee = feeLIst.filter(
               (feeInfo) => feeInfo.mintCount === gameItem.mintingFeeCode,
             )[0];
@@ -282,7 +291,7 @@ export class V1MintService {
     }
 
     const userTokenBalance = await this.bcClient.getBalance(
-      gameApiV1ValidItemDto.accAddress,
+        reqDto.accAddress,
     );
     if (userTokenBalance < serviceFee.div(digits)) {
       throw new MintException(
@@ -293,23 +302,25 @@ export class V1MintService {
     }
 
     const userGameTokenBalance = await this.bcClient.getBalance(
-      gameApiV1ValidItemDto.accAddress,
+        reqDto.accAddress,
     );
     if (userGameTokenBalance < gameFee.div(digits)) {
       throw new MintException(
         'game token balance is insufficient.',
         '',
-          MintHttpStatus.NOT_ENOUGH_TOKEN,
+        MintHttpStatus.NOT_ENOUGH_TOKEN,
       );
     }
 
-    return <GameApiV1CalculateMintingFeeDto>{
+    return <GameApiV1CalculateMintingDataDto>{
+      items: requestedItems,
+      tokens: requestedTokens,
       serviceFee: serviceFee.div(digits).toFixed(this.BC_DECIMAL),
       gameFee: gameFee.div(digits).toFixed(this.BC_DECIMAL),
     };
   }
 
-  async mintNft(reqDto: GameApiV1MintDto): Promise<GameApiV1ResponseMintDto> {
+  async mintNft(reqDto: any): Promise<GameApiV1ResponseMintDto> {
     const requestId = getNamespace(RequestContext.NAMESPACE).get(
       RequestContext.REQUEST_ID,
     );
@@ -319,16 +330,11 @@ export class V1MintService {
       //   tokenId exists?
       const gameServerData = await this.gameServerData(reqDto.appId);
 
-      // fixme: change the test code
-      // replyForMint = gameServerInfo.body.data.apiLists.filter(
-      //   (item) => item.apiTypeCd === ApiTypeCode.NOTI_OF_COMPLETION_FOR_MINT,
-      // )[0];
-      const gameServerApi = gameServerData.apiTestLists.filter(
+      const gameServerApi = gameServerData.apiLists.filter(
         (item) => item.apiTypeCd === this.MINT_API_TYPE.get('mint'),
       )[0];
 
-      // fixme: redis로 변경
-      // todo: 시간확인 필요?
+      // todo: 시간확인 필요? ,redis로 변경
       const mintLog = await this.mintRepo.getMintLogByRequestId(
         reqDto.requestId,
       );
@@ -336,8 +342,7 @@ export class V1MintService {
       let serviceFee;
       let gameFee;
       if (mintLog !== null || mintLog !== undefined) {
-        if (
-          !compareObject(
+        const diff = Diff.diffJson(
             {
               appId: reqDto.appId,
               playerId: String(reqDto.playerId),
@@ -347,6 +352,7 @@ export class V1MintService {
               id: reqDto.id,
               serviceFee: reqDto.serviceFee,
               gameFee: reqDto.gameFee,
+              meatadata: reqDto.metadata,
             },
             {
               appId: mintLog.appId,
@@ -357,8 +363,13 @@ export class V1MintService {
               id: mintLog.id,
               serviceFee: String(mintLog.serviceFee),
               gameFee: String(mintLog.gameFee),
+              meatadata: mintLog.metadata,
             },
-          )
+            '',
+        )
+        this.logger.debug(`diff minting ingo: ${diff}`)
+        if (
+            diff.len > 1
         ) {
           throw new GameApiException(
             'requested data mismatched with confirmed data',
@@ -386,12 +397,16 @@ export class V1MintService {
 
       // todo: call game server for updating game info
       const updatedGameRes = await this.axiosClient.post(gameServerApi.apiUrl, {
-        playerId: reqDto.playerId,
-        server: reqDto.server,
-        selectedCid: reqDto.selectedCid,
-        id: reqDto.id,
-        mintType: reqDto.mintType,
+        // playerId: reqDto.playerId,
+        // server: reqDto.server,
         requestId: reqDto.requestId,
+        characterId: reqDto.characterId,
+        tokenId: reqDto.id,
+        // mintType: reqDto.mintType,
+      },{
+          appid: reqDto.appId,
+          server: reqDto.server,
+          pid: reqDto.playerId,
       });
 
       if (!(updatedGameRes.status === 200 || updatedGameRes.status === 201)) {
@@ -403,14 +418,10 @@ export class V1MintService {
       }
 
       // todo: get minter from hsm
-      // const minter = {
-      //   accAddress: 'xpla16v6y48xllwy7amcmvhkv0a3zp7jepl44yvhvxt',
-      //   // publicKey: ''
-      // }; //await getMinterKey();
       const minter = {
-        address: 'xpla16v6y48xllwy7amcmvhkv0a3zp7jepl44yvhvxt',
+        address: 'xpla1my0sjrk4aysgqd42gre4m7ktmf20law6462h45',
         mnemonic:
-          'predict junior nation volcano boat melt glance climb target rubber lyrics rain fall globe face catch plastic receive antique picnic domain head hat glue',
+          'hungry reward borrow menu puzzle frost grief escape long angle heart effort fiction maple quiz exact vault future valley sniff indicate million turtle brave',
       };
 
       // todo: create a token id
@@ -557,7 +568,6 @@ export class V1MintService {
       const signTxByMinter = await this.commonService.sign(
         wallet,
         unSignedTx,
-        await this.sequenceUtil.getSequenceNumber(minter.address),
       );
 
       const encodedUnSignedTx = txEncoding(signTxByMinter);
@@ -565,7 +575,6 @@ export class V1MintService {
       await this.txRepo.saveTx(<TransactionEntity>{
         requestId: requestId,
         senderAddress: reqDto.accAddress,
-        granterAddress: '',
         contractAddress: gameServerData.nftContract,
         txHash: null,
         tx: encodedUnSignedTx,
@@ -593,28 +602,22 @@ export class V1MintService {
     }
   }
 
-  async items(reqDto: GameApiV1MintItemDto): Promise<GameApiV1ResMintItemDto> {
+  async items(reqDto: any): Promise<GameApiV1ResMintItemDto> {
     try {
       const gameServerData = await this.gameServerData(reqDto.appId);
 
-      // fixme: use apiLists
-      // replyForMint = gameServerInfo.body.data.apiLists.filter(
-      //   (item) => item.apiTypeCd === ApiTypeCode.NOTI_OF_COMPLETION_FOR_MINT,
-      // )[0];
       // fixme : category active
-      const gameServerApi = gameServerData.apiTestLists.filter(
+      const gameServerApi = gameServerData.apiLists.filter(
         (item) => item.apiTypeCd === this.MINT_API_TYPE.get(reqDto.mintType),
       )[0];
 
       // todo: check prams to request
-      // call game server to confirm items
-      const gameItems = await this.axiosClient.post(gameServerApi.apiUrl, {
-        playerId: reqDto.playerId,
-        server: reqDto.server,
-        selectedCid: reqDto.selectedCid,
-        categoryId: reqDto.categoryId,
-        categoryName: reqDto.categoryName,
-        categoryType: reqDto.categoryType,
+      const queryString = `?characterId=${reqDto.characterId}&categoryId=${reqDto.categoryId}&categoryType=${reqDto.categoryType}`;
+      const gameItems = await this.axiosClient.get(gameServerApi.apiUrl+queryString,
+{
+        appid: reqDto.appId,
+        server: reqDto.server.join(),
+        pid: reqDto.playerId,
       });
       if (!(gameItems.status === 200 || gameItems.status === 201)) {
         throw new GameApiException(
@@ -646,7 +649,7 @@ export class V1MintService {
   }
 
   async burnNft(
-    reqDto: GameApiV1BurnItemDto,
+    reqDto: any,
   ): Promise<GameApiV1BurnItemResDto> {
     const requestId = getNamespace(RequestContext.NAMESPACE).get(
       RequestContext.REQUEST_ID,
@@ -654,40 +657,34 @@ export class V1MintService {
 
     try {
       const gameServerData = await this.gameServerData(reqDto.appId);
-
       const lockedNft = await this.validateLockNft(
         gameServerData.nftContract,
         reqDto.accAddress,
         [reqDto.tokenId],
       );
-      if (!lockedNft) {
+      if (lockedNft) {
         throw new MintException(
-          'requested token is not existed!',
+          'requested token is locked!',
           '',
           MintHttpStatus.NFT_NOT_EXISTED,
         );
       }
 
-      // fixme: change the test code
-      // replyForMint = gameServerInfo.body.data.apiLists.filter(
-      //   (item) => item.apiTypeCd === ApiTypeCode.NOTI_OF_COMPLETION_FOR_MINT,
-      // )[0];
-      const gameServerApi = gameServerData.apiTestLists.filter(
+      // todo: nft exists?
+      const gameServerApi = gameServerData.apiLists.filter(
         (item) => item.apiTypeCd === this.MINT_API_TYPE.get('lock'),
       )[0];
-
-      const updatedGameItem = await this.axiosClient.post(
+      const updatedGameItem = await this.axiosClient.patch(
         gameServerApi.apiUrl,
         {
-          playerId: reqDto.playerId,
+          requestId: requestId,
+          characterId: reqDto.characterId,
+          tokenId: reqDto.tokenId,
+        },{
+          appid: reqDto.appId,
           server: reqDto.server,
-          selectedCid: reqDto.selectedCid,
-          items: [
-            {
-              tokenId: reqDto.tokenId,
-            },
-          ],
-        },
+          pid: reqDto.playerId,
+        }
       );
 
       if (!(updatedGameItem.status === 200 || updatedGameItem.status === 201)) {
@@ -711,16 +708,13 @@ export class V1MintService {
       await this.txRepo.saveTx(<TransactionEntity>{
         requestId: requestId,
         senderAddress: reqDto.accAddress,
-        // granterAddress: '',
         contractAddress: gameServerData.nftContract,
-        // txHash: null,
         tx: encodedUnSignedTx,
         params: JSON.stringify(reqDto),
         txType: TxType.MINT,
         appId: reqDto.appId,
         playerId: reqDto.playerId,
         status: TxStatus.WAIT,
-        // message: ''
       });
 
       return <GameApiV1BurnItemResDto>{
@@ -729,11 +723,7 @@ export class V1MintService {
       };
     } catch (e) {
       this.logger.error(e);
-      throw new MintException(
-        e.message,
-        e.stack,
-        MintHttpStatus.BURN_FAILED,
-      );
+      throw new MintException(e.message, e.stack, MintHttpStatus.BURN_FAILED);
     }
   }
 
@@ -788,14 +778,45 @@ export class V1MintService {
 
     const wallet = this.bcClient.wallet(user.mnemonic);
 
-    console.log('>>>>>>>>>>>> ', await wallet.sequence());
+    console.log('seq >>>>>>>>', await wallet.sequence());
 
     const signTx = await this.commonService.sign(
       wallet,
       encodedUnSignedTx,
-      await wallet.sequence(),
+      // await wallet.sequence(),
     );
     const txHash = await this.commonService.broadcast(signTx);
+    // return txEncoding(signTx);
     return txHash;
   }
+
+  async testTransfer(): Promise<string> {
+    const msg = await this.cw20Service.transferToken(
+        'xpla1drrlzr6d44f9gm9u45h8td6y7scqcl9e853xvxzdc2mpfzjaqprsehpjd6',
+        'xpla1my0sjrk4aysgqd42gre4m7ktmf20law6462h45',
+        'xpla1h086yrxdzhgqzftk2hzcgst9gywttqd2d32g6q',
+        '10000000000')
+
+    const signer = [
+      {
+        address: 'xpla1my0sjrk4aysgqd42gre4m7ktmf20law6462h45',
+      }
+      ]
+    const unSignedTx: Tx = await this.commonService.makeTx(
+        signer, [msg]
+    )
+
+    const mnemonic = 'hungry reward borrow menu puzzle frost grief escape long angle heart effort fiction maple quiz exact vault future valley sniff indicate million turtle brave'
+    const wallet = this.bcClient.wallet(mnemonic);
+
+    const signTxByMinter = await this.commonService.sign(
+        wallet,
+        unSignedTx,
+    );
+
+    const txHash = await this.commonService.broadcast(signTxByMinter);
+
+    return txHash;
+  }
+
 }

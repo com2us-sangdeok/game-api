@@ -13,15 +13,16 @@ import { txDecoding, txEncoding } from '../../../util/encoding';
 import { V1LockOutputDto } from '../dto/game-api-v1-lock.dto';
 import { SequenceRepository } from '../../../util/repository/sequence.repository';
 import { RequestContext } from '../../../commom/context/request.context';
-import { DataSource } from 'typeorm';
+import { DataSource, QueryRunner } from 'typeorm';
 import { BlockchainError, TxStatus, TxType } from '../../../enum';
 import { TransactionEntity } from '../../../entities';
 import { TransactionRepository } from '../repository/transaction.repository';
+import { CommonCode } from '../../../commom/common-code';
 
+// noinspection DuplicatedCode
 @Injectable()
 export class V1LockService {
   private bc = this.blockchainService.blockChainClient();
-  private lcd = this.blockchainService.lcdClient();
 
   constructor(
     private readonly blockchainService: BlockchainService,
@@ -173,9 +174,9 @@ export class V1LockService {
     );
 
     const admin = {
-      address: 'xpla1xvh9tt6gsrn0yem2fv6xjfrfyefal42ezzxhca',
+      address: 'xpla16v6y48xllwy7amcmvhkv0a3zp7jepl44yvhvxt',
       mnemonic:
-        'pave taste ball fortune will casual fresh gain aunt horror town leave breeze horn satoshi warfare bind skate lucky plastic check nose position pencil',
+        'predict junior nation volcano boat melt glance climb target rubber lyrics rain fall globe face catch plastic receive antique picnic domain head hat glue',
     };
 
     let consoleGameInfo;
@@ -200,7 +201,7 @@ export class V1LockService {
 
     if (!nftContract || !lockContract) {
       throw new GameApiException(
-        'contract error',
+        'not found(nft || lock contract)',
         '',
         GameApiHttpStatus.INTERNAL_SERVER_ERROR,
       );
@@ -213,15 +214,11 @@ export class V1LockService {
 
     if (lockNftList.length < 1) {
       throw new GameApiException(
-        'empty lock nft list error',
+        'not fount(locked nft)',
         '',
         GameApiHttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
-
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction('SERIALIZABLE');
 
     const msg = await this.lockService.unLock(
       lockContract,
@@ -230,9 +227,28 @@ export class V1LockService {
       admin.address,
     );
     const signer = [{ address: admin.address }];
+
     const unSignedTx = await this.commonService.makeTx(signer, [msg]);
 
     const wallet = this.bc.client.wallet(admin.mnemonic);
+
+    let gameUnlockApi = consoleGameInfo.data.apiLists.filter(
+      (v) => v.apiTypeCd === CommonCode.GAME_ITEM_UNLOCK,
+    );
+
+    if (gameUnlockApi.length !== 1) {
+      throw new GameApiException(
+        'not found(game server unlock api url)',
+        '',
+        GameApiHttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+    gameUnlockApi = gameUnlockApi[0];
+
+    const queryRunner: QueryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction('SERIALIZABLE');
 
     //lock contract owner address info
     const lockOwnerInfo = await this.sequenceRepo.getSequenceNumber(
@@ -242,7 +258,6 @@ export class V1LockService {
 
     if (!lockOwnerInfo) {
       await queryRunner.rollbackTransaction();
-      await queryRunner.release();
       throw new GameApiException(
         'lock contract owner info error',
         '',
@@ -255,55 +270,61 @@ export class V1LockService {
       lockOwnerInfo.sequenceNumber,
     );
 
-    let txHash;
     try {
-      txHash = await this.commonService.broadcast(signTx);
-
-      if (!txHash.code || txHash.code === BlockchainError.SUCCESS) {
-        //TODO console-api 에서 받아온 주소로 변경 필요
-        await this.sequenceRepo.updateSequenceFromDb(
-          queryRunner,
-          admin.address,
-        );
-
-        const dbParam = {
-          ...param,
-          ...consoleGameInfo.data,
-        };
-        try {
-          const txEntity = new TransactionEntity({
-            requestId,
-            senderAddress: senderAdress,
-            contractAddress: consoleGameInfo.data?.lockContract || null,
-            tx: txEncoding(signTx),
-            txHash: null,
-            params: JSON.stringify(dbParam),
-            txType: TxType.LOCK,
-            status: TxStatus.PENDING,
-            appId: param.appId,
-            playerId: param.playerId,
-          });
-
-          const result = await this.txRepo.saveTx(txEntity);
-        } catch (err) {
-          console.log(err);
-          throw new GameApiException(
-            err.message,
-            err.stack,
-            GameApiHttpStatus.INTERNAL_SERVER_ERROR,
-          );
-        }
-
-        await queryRunner.commitTransaction();
-      } else {
+      const gameApiResult = await this.axiosClientUtil.post(
+        gameUnlockApi.apiUrl,
+        { name: '?', description: '?', uniqueId: '', tokenId: param.tokenId },
+      );
+      if (gameApiResult.body.code !== 200) {
         await queryRunner.rollbackTransaction();
-        await queryRunner.release();
         throw new GameApiException(
-          'broadcast error',
+          'game server unlock api error',
           '',
           GameApiHttpStatus.INTERNAL_SERVER_ERROR,
         );
       }
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      throw new GameApiException(
+        'game server unlock api error',
+        '',
+        GameApiHttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+    let txHash;
+    try {
+      txHash = await this.commonService.broadcast(signTx);
+
+      if (txHash.code && txHash.code !== BlockchainError.SUCCESS) {
+        throw new GameApiException(
+          txHash.raw_log,
+          'broadcast error',
+          GameApiHttpStatus.INTERNAL_SERVER_ERROR,
+        );
+      }
+      await this.sequenceRepo.updateSequenceFromDb(queryRunner, admin.address);
+
+      const dbParam = {
+        ...param,
+        ...consoleGameInfo.data,
+      };
+      const txEntity = new TransactionEntity({
+        requestId,
+        senderAddress: senderAdress,
+        contractAddress: consoleGameInfo.data?.lockContract || null,
+        tx: txEncoding(signTx),
+        txHash: txHash.txhash,
+        params: JSON.stringify(dbParam),
+        txType: TxType.UNLOCK,
+        status: TxStatus.PENDING,
+        appId: param.appId,
+        playerId: param.playerId,
+      });
+
+      const result = await this.txRepo.saveTx(txEntity);
+
+      await queryRunner.commitTransaction();
     } catch (err) {
       await queryRunner.rollbackTransaction();
 

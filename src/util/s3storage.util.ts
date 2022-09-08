@@ -15,10 +15,6 @@ export class S3storageUtil {
       accessKeyId: this.configService.get('AWS_S3_ACCESS_KEY'),
       secretAccessKey: this.configService.get('AWS_S3_KEY_SECRET'),
       region: this.configService.get('AWS_REGION'),
-      // credentials: {
-      //   accessKeyId: this.configService.get('AWS_S3_ACCESS_KEY'),
-      //   secretAccessKey: this.configService.get('AWS_S3_KEY_SECRET'),
-      // },
     });
   }
 
@@ -30,19 +26,46 @@ export class S3storageUtil {
         Body: data,
       };
       const result = await this.S3.upload(uploadParams).promise();
+
       return result.Location;
     } catch (e) {
-      console.log(
-        '--------------------------------------------------------------------',
-      );
       console.log(e);
-      console.log(
-        '--------------------------------------------------------------------',
-      );
       throw new GameApiException(
         e.message,
         e.stack,
-        GameApiHttpStatus.INTERNAL_SERVER_ERROR,
+        GameApiHttpStatus.EXTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  public async create(bucketName: string): Promise<string> {
+    try {
+      const bucketParams = {
+        Bucket : bucketName
+      };
+
+      const result = await this.S3.createBucket(bucketParams).promise();
+      return result.Location;
+    } catch (e) {
+      console.log(e);
+      throw new GameApiException(
+          e.message,
+          e.stack,
+          GameApiHttpStatus.EXTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  public async listBuckets(): Promise<any> {
+    try {
+      const result = await this.S3.listBuckets().promise();
+      return result;
+    } catch (e) {
+      console.log(e);
+      throw new GameApiException(
+          e.message,
+          e.stack,
+          GameApiHttpStatus.EXTERNAL_SERVER_ERROR,
       );
     }
   }

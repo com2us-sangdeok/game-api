@@ -71,4 +71,16 @@ export class AssetV1Controller {
       result,
     );
   }
+
+  @Get('test')
+  @ApiOperation({ summary: 'get asset-api info' })
+  async test(
+  ): Promise<CommonResponseDto<AssetEntity>> {
+    const result = await this.apiV1Service.test();
+    return new CommonResponseDto<AssetEntity>(
+        GameApiHttpStatus.OK,
+        'success',
+        result,
+    );
+  }
 }

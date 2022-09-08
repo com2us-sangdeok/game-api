@@ -1,6 +1,14 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, Injectable } from '@nestjs/common';
 import { BlockchainService } from '../blockchain/blockchain.service';
-import { Msg, MsgSend, Tx, Wallet, SignMode } from '@xpla/xpla.js';
+import {
+  Msg,
+  MsgSend,
+  Tx,
+  Wallet,
+  SignMode,
+  isTxError,
+  TxInfo,
+} from '@xpla/xpla.js';
 import { Coinbalance } from './modules.inerface';
 import {
   BlockchainException,
@@ -21,8 +29,10 @@ export class CommonService {
       });
     } catch (err) {
       throw new BlockchainException(
-        err.response.message,
-        err.response?.data,
+        {
+          message: err.response.data.message,
+        },
+        err.message,
         BlockchainStatus.CREATE_TX_ERROR,
       );
     }
@@ -40,9 +50,14 @@ export class CommonService {
       });
       return sign;
     } catch (err) {
+      console.log('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%');
+      console.log(err);
+      console.log('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%');
       throw new BlockchainException(
-        err.response.message,
-        err.response?.data,
+        {
+          message: err.response.data.message,
+        },
+        err.message,
         BlockchainStatus.SIGN_ERROR,
       );
     }
@@ -62,24 +77,58 @@ export class CommonService {
       return new MsgSend(sender, receiver, amount + denom);
     } catch (err) {
       throw new BlockchainException(
-        err.response.message,
-        err.response?.data,
+        {
+          message: err.response.data.message,
+        },
+        err.message,
         BlockchainStatus.TRANSFER_COIN_ERROR,
       );
     }
   }
 
-  // TODO. game-api 서버에서 broadcast 기능 없애야함
-  // Queue에 넣고 consumer에서 처리
   public async broadcast(signedTx: Tx): Promise<any> {
     try {
       return await this.lcd.tx.broadcastSync(signedTx);
     } catch (err) {
       throw new BlockchainException(
-        err.response.message,
-        err.response?.data,
+        {
+          message: err.response.data.message,
+        },
+        err.message,
         BlockchainStatus.BROADCAST_ERROR,
       );
+    }
+  }
+
+  public async txDetail(tx: string): Promise<{
+    error: boolean;
+    code: number;
+    txInfo: TxInfo | undefined;
+    message: string;
+  }> {
+    try {
+      let message = '';
+      let error = true;
+      let code = 0;
+
+      const txInfo = await this.bc.client.getTx(tx).catch((e) => {
+        message = e.response?.data.message;
+        code = e.response?.data.code;
+        return null;
+      });
+
+      if (txInfo) {
+        error = isTxError(txInfo);
+        code = txInfo.code;
+      }
+      return {
+        error: error,
+        code: code,
+        txInfo: txInfo,
+        message: message,
+      };
+    } catch (err) {
+      console.log(err);
     }
   }
 }

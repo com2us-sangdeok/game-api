@@ -1,8 +1,8 @@
-import {ServerException} from "./server.exception";
+import { HttpException } from '@nestjs/common';
 
-export class BlockchainException extends ServerException {
+export class BlockchainException extends HttpException {
   constructor(message: any, error: any = '', statusCode: BlockchainStatus = 0) {
-    super(ServerException.createBody(message, error, statusCode), statusCode);
+    super(HttpException.createBody(message, error, statusCode), statusCode);
   }
 }
 
@@ -29,6 +29,9 @@ export enum BlockchainStatus {
   NFT_INLOCK_SIGN_ERROR,
   NFT_LOCK_LIST_ERROR,
 
+  //txcheck Error
+  TX_CHECK_ERROR,
+
   //broadcast
-  BROADCAST_ERROR = 999,
+  BROADCAST_ERROR = 9999,
 }

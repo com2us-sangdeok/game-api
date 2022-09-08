@@ -9,6 +9,7 @@ import {
   BlockchainException,
   BlockchainStatus,
 } from '../../../exception/blockchain.exception';
+import { GameApiHttpStatus } from '../../../exception/request.exception';
 
 // nft lock, unlock tx 생성
 //TODO LOCK CONTRACT 필요
@@ -65,7 +66,9 @@ export class LockService {
       );
     } catch (err) {
       throw new BlockchainException(
-        err.message,
+        {
+          message: err.response.data.message,
+        },
         err.response?.data,
         BlockchainStatus.NFT_LOCK_ERROR,
       );
@@ -91,7 +94,9 @@ export class LockService {
       });
     } catch (err) {
       throw new BlockchainException(
-        err.message,
+        {
+          message: err.response.data.message,
+        },
         err.response?.data,
         BlockchainStatus.NFT_UNLOCK_ERROR,
       );
@@ -107,7 +112,9 @@ export class LockService {
       return await this.commonService.sign(ownerWallet, tx);
     } catch (err) {
       throw new BlockchainException(
-        err.message,
+        {
+          message: err.response.data.message,
+        },
         err.response?.data,
         BlockchainStatus.NFT_INLOCK_SIGN_ERROR,
       );
@@ -124,7 +131,9 @@ export class LockService {
       });
     } catch (err) {
       throw new BlockchainException(
-        err.message,
+        {
+          message: err.response.data.message,
+        },
         err.response?.data,
         BlockchainStatus.NFT_LOCK_LIST_ERROR,
       );

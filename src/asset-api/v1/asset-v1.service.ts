@@ -134,4 +134,11 @@ export class AssetV1Service {
       );
     }
   }
+
+  async test(): Promise<any> {
+
+
+    console.log('list > ' , await this.s3.listBuckets())
+    console.log(await this.s3.create('xpla-game'))
+  }
 }

@@ -6,6 +6,7 @@ import {
   BlockchainException,
   BlockchainStatus,
 } from '../../../exception/blockchain.exception';
+import { GameApiHttpStatus } from '../../../exception/request.exception';
 
 @Injectable()
 export class CW721Service {
@@ -42,7 +43,9 @@ export class CW721Service {
       );
     } catch (err) {
       throw new BlockchainException(
-        err.message,
+        {
+          message: err.response.data.message,
+        },
         err.response?.data,
         BlockchainStatus.NFT_MINT_ERROR,
       );
@@ -63,8 +66,10 @@ export class CW721Service {
       });
     } catch (err) {
       throw new BlockchainException(
-        err.message,
-        err?.code,
+        {
+          message: err.response.data.message,
+        },
+        err.response?.data,
         BlockchainStatus.NFT_BURN_ERROR,
       );
     }
@@ -80,11 +85,10 @@ export class CW721Service {
         tokens: { owner: address },
       });
     } catch (err) {
-      console.log('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@');
-      console.log(err.response.data);
-      console.log('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@');
       throw new BlockchainException(
-        err.message,
+        {
+          message: err.response.data.message,
+        },
         err.response?.data,
         BlockchainStatus.GET_NFT_LIST_ERROR,
       );
@@ -102,7 +106,9 @@ export class CW721Service {
       });
     } catch (err) {
       throw new BlockchainException(
-        err.message,
+        {
+          message: err.response.data.message,
+        },
         err.response?.data,
         BlockchainStatus.GET_NFT_DETAIL_ERROR,
       );
@@ -127,7 +133,9 @@ export class CW721Service {
       return new MsgExecuteContract(sender, nftContract, { ...executeMsg }, {});
     } catch (err) {
       throw new BlockchainException(
-        err.message,
+        {
+          message: err.response.data.message,
+        },
         err.response?.data,
         BlockchainStatus.NFT_TRANSFER_ERROR,
       );
@@ -155,7 +163,9 @@ export class CW721Service {
       return new MsgExecuteContract(sender, nftContract, { ...executeMsg }, {});
     } catch (err) {
       throw new BlockchainException(
-        err.message,
+        {
+          message: err.response.data.message,
+        },
         err.response?.data,
         BlockchainStatus.NFT_SEND_ERROR,
       );

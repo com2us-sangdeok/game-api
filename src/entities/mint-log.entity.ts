@@ -7,40 +7,45 @@ import {
   TableIndex,
 } from 'typeorm';
 import { MintType, MintLogStatus } from '../enum';
+import {Metadata} from "../metadata-api/v1/type/meta-info";
+import {ExtensionDto} from "../metadata-api/v1/dto/metadata-v1.dto";
 
 @Entity('tb_mint_log')
 export class MintLogEntity {
-  @PrimaryColumn({ type: 'varchar' })
-  requestId: string;
+  @PrimaryColumn({name: 'request_id', type: 'varchar' })
+    requestId: string;
 
-  @Column({ type: 'enum', enum: MintType, default: MintType.ITEM })
+  @Column({ name: 'mint_type', type: 'enum', enum: MintType, default: MintType.ITEM })
   mintType: MintType;
 
-  @Column({ type: 'bigint' })
+  @Column({ name: 'player_id', type: 'bigint' })
   playerId: number;
 
-  @Column({ type: 'varchar' })
+  @Column({ name: 'server', type: 'varchar' })
   server: string;
 
-  @Column({ type: 'varchar' })
+  @Column({ name: 'acc_address', type: 'varchar' })
   accAddress: string;
 
-  @Column({ type: 'varchar' })
+  @Column({ name: 'app_id', type: 'varchar' })
   appId: string;
 
-  @Column({ type: 'varchar' })
+  @Column({ name: 'id', type: 'varchar' })
   id: string;
 
-  @Column({ type: 'varchar' })
+  @Column({ name: 'metadata', type: 'json' })
+  metadata: ExtensionDto;
+
+  @Column({ name: 'service_fee', type: 'varchar' })
   serviceFee: string;
 
-  @Column({ type: 'varchar' })
+  @Column({ name: 'game_fee', type: 'varchar' })
   gameFee: string;
 
-  @Column({ type: 'enum', enum: MintLogStatus, default: MintLogStatus.READY })
+  @Column({ name: 'status', type: 'enum', enum: MintLogStatus, default: MintLogStatus.READY })
   status: MintLogStatus;
 
-  @CreateDateColumn()
+  @CreateDateColumn({name: 'created_at'})
   createdAt: string;
 }
 

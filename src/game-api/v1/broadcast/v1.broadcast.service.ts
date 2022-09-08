@@ -2,9 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { txDecoding } from '../../../util/encoding';
 import { TransactionRepository } from '../repository/transaction.repository';
 import { DataSource } from 'typeorm';
-import { TxStatus } from '../../../enum';
+import { BlockchainError, TxStatus } from '../../../enum';
 import { CommonService } from '../../../bc-core/modules/common.service';
 import { V1GameApiBroadcastOutputDto } from '../dto/game-api-v1-broadcast.dto';
+import { BlockchainException } from '../../../exception/blockchain.exception';
+import {
+  GameApiException,
+  GameApiHttpStatus,
+} from '../../../exception/request.exception';
 
 @Injectable()
 export class V1BroadcastService {
@@ -21,22 +26,38 @@ export class V1BroadcastService {
     await queryRunner.connect();
     await queryRunner.startTransaction('SERIALIZABLE');
 
+    let txHash;
     try {
-      const result = await this.txRepo.updTxStatus(
-        queryRunner,
-        requestId,
-        TxStatus.PENDING,
-      );
+      txHash = await this.commonService.broadcast(decodedTx);
 
-      await queryRunner.commitTransaction();
+      if (!txHash.code || txHash.code === BlockchainError.SUCCESS) {
+        const result = await this.txRepo.updTxStatus(
+          queryRunner,
+          requestId,
+          TxStatus.PENDING,
+          signedTx,
+          txHash.txhash,
+        );
+        await queryRunner.commitTransaction();
+      } else {
+        throw txHash.txhash;
+      }
     } catch (err) {
       await queryRunner.rollbackTransaction();
+      throw new GameApiException(
+        'broadcast error' + err,
+        '',
+        GameApiHttpStatus.INTERNAL_SERVER_ERROR,
+      );
     } finally {
       await queryRunner.release();
     }
-    const txHash = await this.commonService.broadcast(decodedTx);
     return {
       txHash: txHash.txhash,
     };
+  }
+
+  async txCheck(txHash: string): Promise<any> {
+    return await this.commonService.txDetail(txHash);
   }
 }

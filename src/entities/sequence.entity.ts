@@ -3,11 +3,15 @@ import {
   CreateDateColumn,
   Entity,
   PrimaryColumn,
+  PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 
 @Entity('Sequence')
 export class SequenceEntity {
+  @PrimaryGeneratedColumn('increment')
+  id: number;
+
   @PrimaryColumn({ type: 'varchar', length: 64 })
   accAddress: string;
 

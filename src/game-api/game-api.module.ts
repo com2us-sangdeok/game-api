@@ -28,7 +28,7 @@ import {
   MintLogEntity,
   SequenceEntity,
 } from '../entities';
-import {MetadataModule} from "../metadata-api/metadata.module";
+import { MetadataModule } from '../metadata-api/metadata.module';
 import { SequenceRepository } from '../util/repository/sequence.repository';
 import { SequenceUtil } from '../util/sequence.util';
 import { ConvertRepository } from './v1/repository/convert.repository';
@@ -59,7 +59,12 @@ import { V1BroadcastService } from './v1/broadcast/v1.broadcast.service';
     MetadataModule,
     BcCoreModule,
   ],
-  controllers: [V1MintController, V1ConvertController, V1LockController],
+  controllers: [
+    V1MintController,
+    V1ConvertController,
+    V1LockController,
+    V1BroadcastController,
+  ],
   providers: [
     ...coreProviders,
     BlockchainService,

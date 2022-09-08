@@ -18,6 +18,15 @@ export class V1GameApiBroadcastInputDto {
   signedTx: string;
 }
 
+export class V1GameApiTxCheckInputDto {
+  @ApiProperty({
+    example: '7E48EE001092EC0F8631B6AFBDAF7F8AE18BD1BBC23DC3C67B60DFC88B660571',
+    description: 'Tx Hash',
+  })
+  @IsString()
+  txHash: string;
+}
+
 export class V1GameApiBroadcastOutputDto {
   @ApiProperty({
     example: '779E8A0C433292EE1F15CC6587D43EE05D73DA8ACF14AC12F16EA0CE923F5130',

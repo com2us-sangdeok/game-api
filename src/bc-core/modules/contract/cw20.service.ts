@@ -6,6 +6,7 @@ import {
   BlockchainException,
   BlockchainStatus,
 } from '../../../exception/blockchain.exception';
+import { GameApiHttpStatus } from '../../../exception/request.exception';
 
 @Injectable()
 export class CW20Service {
@@ -33,8 +34,10 @@ export class CW20Service {
       };
     } catch (err) {
       throw new BlockchainException(
+        {
+          message: err.response.data.message,
+        },
         err.message,
-        err.response?.data,
         BlockchainStatus.GET_TOKEN_BALANCE_ERROR,
       );
     }
@@ -63,8 +66,10 @@ export class CW20Service {
       );
     } catch (err) {
       throw new BlockchainException(
+        {
+          message: err.response.data.message,
+        },
         err.message,
-        err.response?.data,
         BlockchainStatus.TRANSFER_TOKEN_ERROR,
       );
     }

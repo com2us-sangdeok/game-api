@@ -6,14 +6,14 @@ import {
 
 @Entity('tb_token_id')
 export class TokenIdEntity {
-  @PrimaryColumn({ type: 'varchar', length: 64 })
+  @PrimaryColumn({ name: 'nft_address', type: 'varchar', length: 64 })
   nftAddress: string;
 
-  @Column({ type: 'varchar', length: 64 })
+  @Column({ name: 'app_id', type: 'varchar', length: 64 })
   appId: string;
 
-  @Column({ type: 'bigint' })
-  sequenceNumber: number;
+  @Column({ name: 'token_id', type: 'bigint' })
+  tokenId: number;
 
   @CreateDateColumn()
   createdAt: string;

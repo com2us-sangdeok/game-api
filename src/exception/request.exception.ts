@@ -1,4 +1,4 @@
-import {ServerException} from "./server.exception";
+import { ServerException } from './server.exception';
 
 export class GameApiException extends ServerException {
   constructor(message: any, error: any, statusCode: GameApiHttpStatus) {
@@ -8,8 +8,8 @@ export class GameApiException extends ServerException {
 
 export enum GameApiHttpStatus {
   OK = 1000,
-  CREATED ,
-  BAD_REQUEST ,
+  CREATED,
+  BAD_REQUEST,
   NOT_FOUND,
   INTERNAL_SERVER_ERROR,
   EXTERNAL_SERVER_ERROR,

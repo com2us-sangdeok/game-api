@@ -31,7 +31,7 @@ export class MintRepository {
         .useTransaction(true)
         .setLock('pessimistic_read')
         .setLock('pessimistic_write')
-        .where('nftAddress = :nftAddress', { nftAddress: entity.nftAddress })
+        .where('nft_address = :nftAddress', { nftAddress: entity.nftAddress })
         .getOne();
 
       if (
@@ -50,7 +50,7 @@ export class MintRepository {
             {
               nftAddress: entity.nftAddress,
               appId: entity.appId,
-              sequenceNumber: 1,
+              tokenId: 1,
             },
           ])
           .execute();
@@ -63,10 +63,10 @@ export class MintRepository {
           .setLock('pessimistic_read')
           .setLock('pessimistic_write')
           .update(TokenIdEntity)
-          .set({ sequenceNumber: () => '`sequenceNumber`+1' })
-          .where('nftAddress = :nftAddress', { nftAddress: entity.nftAddress })
+          .set({ tokenId: () => '`token_id`+1' })
+          .where('nft_address = :nftAddress', { nftAddress: entity.nftAddress })
           .execute();
-        const currentSequence = sequenceProviderEntity.sequenceNumber ?? 0;
+        const currentSequence = sequenceProviderEntity.tokenId ?? 0;
         nextSequenceNumber = Number(currentSequence) + 1;
       }
       await queryRunner.commitTransaction();
@@ -93,7 +93,7 @@ export class MintRepository {
     // return await this.mintLogRepo.findOneBy({requestId: requestId})
     return await this.mintLogRepo
       .createQueryBuilder('mintLogEntity')
-      .where('mintLogEntity.requestId = :requestId', { requestId: requestId })
+      .where('mintLogEntity.request_id = :requestId', { requestId: requestId })
       // .andWhere(
       //   'mintLogEntity.createdAt >= date_add(now(), interval -5 minute )',
       // )

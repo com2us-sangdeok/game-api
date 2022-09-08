@@ -8,6 +8,7 @@ import {
 import { V1BroadcastService } from './v1.broadcast.service';
 import {
   V1GameApiBroadcastInputDto,
+  V1GameApiTxCheckInputDto,
   V1GameApiBroadcastOutputDto,
 } from '../dto/game-api-v1-broadcast.dto';
 import { GameApiHttpStatus } from '../../../exception/request.exception';
@@ -46,13 +47,25 @@ export class V1BroadcastController {
   @ApiResponse({
     status: 200,
     description: '',
-    // type: V1GameApiBroadcastInputDto,
+    type: V1GameApiTxCheckInputDto,
   })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
-  async txCheck(@Body() body: any): Promise<any> {
-    const result = {
-      a: 'a',
-    };
+  async txCheck(@Body() body: V1GameApiTxCheckInputDto): Promise<any> {
+    console.log('^^^^^^^^');
+
+    const tt = await this.broadcastService.broadcast(
+      '10e771b2-71b1-4ef8-b5ff-1955cd647e1a',
+      '7E48EE001092EC0F8631B6AFBDAF7F8AE18BD1BBC23DC3C67B60DFC88B660571',
+    );
+
+    console.log('%%%%%%%%%%%%%%%% tt %%%%%%%%%%%%%%%%%%%%%%');
+    console.log(tt);
+    console.log('%%%%%%%%%%%%%%%% tt %%%%%%%%%%%%%%%%%%%%%%');
+    const result = await this.broadcastService.txCheck(body.txHash);
+
+    console.log('$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$');
+    console.log(result);
+    console.log('$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$');
     return new CommonResponseDto(GameApiHttpStatus.OK, 'success', result);
   }
 }
