@@ -4,8 +4,8 @@ import { ApiBody, ApiConsumes } from '@nestjs/swagger';
 import { MulterOptions } from '@nestjs/platform-express/multer/interfaces/multer-options.interface';
 
 export function ApiFile(
-  fieldName: string = 'file',
-  required: boolean = true,
+  fieldName = 'file',
+  required = true,
   localOptions?: MulterOptions,
 ) {
   return applyDecorators(

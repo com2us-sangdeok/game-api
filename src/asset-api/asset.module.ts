@@ -9,7 +9,7 @@ import { S3storageUtil } from '../util/s3storage.util';
 import { AxiosClientUtil } from '../util/axios-client.util';
 import { HttpModule } from '@nestjs/axios';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-// import { ImageUtil } from '../util/image.util';
+import { ImageUtil } from '../util/image.util';
 
 @Module({
   exports: [AssetV1Service],
@@ -28,7 +28,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
   providers: [
     AssetRepository,
     AssetV1Service,
-    // ImageUtil,
+    ImageUtil,
     AxiosClientUtil,
     S3storageUtil,
   ],

@@ -6,31 +6,50 @@ import {
 } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { GameApiModule } from './game-api/game-api.module';
 import { TerminusModule } from '@nestjs/terminus';
 import { HttpModule } from '@nestjs/axios';
 import { TypeOrmModule, TypeOrmModuleAsyncOptions } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { BcCoreModule } from './bc-core/core.module';
 import { WinstonModule } from 'nest-winston';
-import {
-  getLogFormat,
-  typeOrmTransports,
-} from './commom/logger/winston.config';
+import { getLogFormat, typeOrmTransports } from './logger/winston.config';
 import { LoggerMiddleware } from './middleware/logger.middleware';
-import DatabaseLogger from './commom/logger/database.logger';
+import DatabaseLogger from './logger/database.logger';
 import { RequestContextMiddleware } from './middleware/request-context.middleware';
-import { AssetModule } from './asset-api/asset.module';
-import { MetadataModule } from './metadata-api/metadata.module';
 import {
-  AssetEntity,
-  MetadataEntity,
-  ConvertPoolEntity,
-  TokenIdEntity,
-  MintLogEntity,
-  SequenceEntity,
-  TransactionEntity,
-} from './entities';
+  CodeEntity,
+  CodeGroupEntity,
+  CodeGroupCodeEntity,
+  CompanyEntity,
+  AppInfoEntity,
+  CompanyNameEntity,
+  GameInfoEntity,
+  GameServerEntity,
+  GameNameEntity,
+  BlockChainGameServerEntity,
+} from './commom/repository/common.entitty';
+import { BetaGameEntity } from './entities/beta-game.entity';
+import {
+  BetaGameApplyEntity,
+  BetaGameLinkEntity,
+  BetaGameImagesEntity,
+} from './entities/beta-game-apply.entity';
+import {
+  BlockchainGameEntitty,
+  BlockchainGameApiInfoEntity,
+  BlockchainGameApiTestInfoEntity,
+  MintCategorySettingInfoEntity,
+  ConvertSettingInfoEntity,
+  MintFeeInfoEntity,
+} from './entities/blockchain-game.entitty';
+import { AssetEntity } from './entities/asset.entity';
+import { BetaGameModule } from './beta-game-api/beta-game.module';
+import { ConsoleApiModule } from './console-api/console-api.module';
+import { GameCommonApiModule } from './game-common-api/game-common-api.module';
+import { GameApiModule } from './sample-game-api/game-api.module';
+import { AssetModule } from './asset-api/asset.module';
+import { WalletApiModule } from './wallet-api/wallet-api.module';
+import { WalletInfoEntity } from './entities/wallet-info.entity';
+import { ContractApiModule } from './contract-api/contract-api.module';
 
 @Module({
   imports: [
@@ -57,15 +76,39 @@ import {
           password: configService.get('DB_PASSWORD'),
           database: configService.get('DB_DATABASE'),
           entities: [
-            ConvertPoolEntity,
+            /** 공용 */
+            CodeEntity,
+            CodeGroupEntity,
+            CodeGroupCodeEntity,
+            CompanyEntity,
+            AppInfoEntity,
+            CompanyNameEntity,
+            GameInfoEntity,
+            GameServerEntity,
+            GameNameEntity,
+            BlockChainGameServerEntity,
+
+            /** 베타게임런처 신청 */
+            BetaGameApplyEntity,
+            BetaGameLinkEntity,
+            BetaGameImagesEntity,
+            /** 베타게임런처 현황 */
+            BetaGameEntity,
+
+            /** 블록체인게임 */
+            BlockchainGameEntitty,
+            BlockchainGameApiInfoEntity,
+            BlockchainGameApiTestInfoEntity,
+            MintCategorySettingInfoEntity,
+            ConvertSettingInfoEntity,
+            MintFeeInfoEntity,
+
+            /** 이미지 업로드 */
             AssetEntity,
-            MetadataEntity,
-            SequenceEntity,
-            TokenIdEntity,
-            MintLogEntity,
-            TransactionEntity,
+
+            /** 지갑 관리 */
+            WalletInfoEntity,
           ],
-          // synchronize: true,
           synchronize: configService.get('DB_SYNCHRONIZE') === 'true',
           logging: true,
           logger: new DatabaseLogger(process.env.NODE_ENV),
@@ -73,10 +116,20 @@ import {
       },
       inject: [ConfigService],
     }),
+    /** 베타게임런처 API */
+    BetaGameModule,
+    /** 콘솔 API */
+    ConsoleApiModule,
+    /** 웹뷰 API */
+    GameCommonApiModule,
+    /** 샘플게임 API */
     GameApiModule,
+    /** 이미지 업로드 */
     AssetModule,
-    BcCoreModule,
-    MetadataModule,
+    /** 지갑 관리 */
+    WalletApiModule,
+    /** 컨트랙트 관리 */
+    ContractApiModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,17 +1,17 @@
 import { ApiResponseProperty } from '@nestjs/swagger';
 
 export class CommonResponseDto<T> {
-  constructor(code: number, message?: string, data?: T) {
-    this.code = code;
+  constructor(code: number, message: string, data?: T) {
+    this.statusCode = code;
     this.message = message;
     this.data = data;
   }
 
   @ApiResponseProperty()
-  code: number;
+  statusCode: number;
 
   @ApiResponseProperty()
-  message?: string;
+  message: string;
 
   @ApiResponseProperty()
   data?: T;

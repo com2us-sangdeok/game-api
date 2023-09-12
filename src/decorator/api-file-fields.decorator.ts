@@ -40,19 +40,13 @@ export function ApiFileFields(
   );
 }
 
-export function ApiImageFile(
-  fileName: string = 'image',
-  required: boolean = false,
-) {
+export function ApiImageFile(fileName = 'image', required = false) {
   return ApiFile(fileName, required, {
     fileFilter: fileMimetypeFilter('image'),
   });
 }
 
-export function ApiPdfFile(
-  fileName: string = 'document',
-  required: boolean = false,
-) {
+export function ApiPdfFile(fileName = 'document', required = false) {
   return ApiFile(fileName, required, {
     fileFilter: fileMimetypeFilter('pdf'),
   });

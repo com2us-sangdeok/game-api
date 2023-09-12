@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { createNamespace, getNamespace, Namespace } from 'cls-hooked';
-import { isNullOrUndefined } from 'util';
 import { RequestContext } from '../commom/context/request.context';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
@@ -11,18 +10,18 @@ export class AxiosClientUtil {
 
   constructor(private httpService: HttpService) {
     this.namespace =
-        getNamespace(RequestContext.NAMESPACE) ||
-        createNamespace(RequestContext.NAMESPACE);
+      getNamespace(RequestContext.NAMESPACE) ||
+      createNamespace(RequestContext.NAMESPACE);
   }
 
   public async get(
-      url: string,
-      headerOpts?: any,
+    url: string,
+    headerOpts?: any,
   ): Promise<AxiosResponseDto<any>> {
-    let headers = this.setHeaderData(headerOpts);
+    const headers = this.setHeaderData(headerOpts);
     try {
       const response = await firstValueFrom(
-          this.httpService.get(url, { headers: headers }),
+        this.httpService.get(url, { headers: headers }),
       );
 
       return new AxiosResponseDto<any>(response.status, '', response.data);
@@ -31,11 +30,19 @@ export class AxiosClientUtil {
     }
   }
 
-  public async post(url: string, data?: any, headerOpts?: any): Promise<any> {
-    let headers = this.setHeaderData(headerOpts);
+  public async post(
+    url: string,
+    data?: any,
+    headerOpts?: any,
+    timeout?: number,
+  ): Promise<any> {
+    const headers = this.setHeaderData(headerOpts);
     try {
       const response = await firstValueFrom(
-          this.httpService.post(url, data, { headers: headers }),
+        this.httpService.post(url, data, {
+          headers: headers,
+          timeout: timeout,
+        }),
       );
 
       return new AxiosResponseDto<any>(response.status, '', response.data);
@@ -45,10 +52,10 @@ export class AxiosClientUtil {
   }
 
   public async put(url: string, data?: any, headerOpts?: any): Promise<any> {
-    let headers = this.setHeaderData(headerOpts);
+    const headers = this.setHeaderData(headerOpts);
     try {
       const response = await firstValueFrom(
-          this.httpService.put(url, data, { headers: headers }),
+        this.httpService.put(url, data, { headers: headers }),
       );
 
       return new AxiosResponseDto<any>(response.status, '', response.data);
@@ -58,10 +65,10 @@ export class AxiosClientUtil {
   }
 
   public async patch(url: string, data?: any, headerOpts?: any): Promise<any> {
-    let headers = this.setHeaderData(headerOpts);
+    const headers = this.setHeaderData(headerOpts);
     try {
       const response = await firstValueFrom(
-          this.httpService.patch(url, data, { headers: headers }),
+        this.httpService.patch(url, data, { headers: headers }),
       );
 
       return new AxiosResponseDto<any>(response.status, '', response.data);
@@ -71,10 +78,10 @@ export class AxiosClientUtil {
   }
 
   private setHeaderData(headerOptions: any): any {
-    let correlationId =
-        this.namespace.get(RequestContext.CORRELATION_ID) ??
-        RequestContext.uniqueKeyGenerator();
-    let header = {
+    const correlationId =
+      this.namespace.get(RequestContext.CORRELATION_ID) ??
+      RequestContext.uniqueKeyGenerator();
+    const header = {
       'Content-Type': 'application/json',
       correlationId: correlationId,
     };

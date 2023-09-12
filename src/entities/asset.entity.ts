@@ -1,40 +1,23 @@
-import {
-  Column,
-  CreateDateColumn,
-  Entity,
-  Index,
-  PrimaryGeneratedColumn,
-} from 'typeorm';
-import {name} from "ts-jest/dist/transformers/hoist-jest";
+import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
-// export enum FileType {
-//     META = 'metadata-api',
-//     ASSET = 'asset-api',
-// }
-
-@Entity('tb_asset')
+@Entity('Asset')
 export class AssetEntity {
   @PrimaryGeneratedColumn()
   id: number;
 
   @Index({ unique: true })
-  @Column({ name: 'filename', type: 'varchar', nullable: false, length: 50 })
+  @Column({ type: 'varchar', nullable: false, length: 50 })
   fileName: string;
 
-  @Column({
-    name: 'original_filename',
-    type: 'varchar',
-    nullable: false,
-    length: 100,
-  })
+  @Column({ type: 'varchar', nullable: false, length: 100 })
   originalName: string;
 
-  @Column({ name: 'file_path', type: 'varchar', nullable: false })
+  @Column({ type: 'varchar', nullable: false })
   filePath: string;
 
-  @Column({ name: 'thumbnail_path', type: 'varchar', default: '' })
+  @Column({ type: 'varchar', default: '' })
   thumbnailPath: string;
 
-  @CreateDateColumn({ name: 'create_at' })
+  @CreateDateColumn()
   createdAt: string;
 }

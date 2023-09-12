@@ -2,9 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 @Injectable()
 export class AppService {
-  constructor() {}
-
   getHello(): string {
-    return 'Hello C2X API Service!';
+    return 'Console Service API';
   }
 }

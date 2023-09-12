@@ -4,6 +4,7 @@ import {
   PipeTransform,
   BadRequestException,
 } from '@nestjs/common';
+import {GameApiException, GameApiHttpStatus} from "../exception/exception";
 
 @Injectable()
 export class ParseFile implements PipeTransform {
@@ -12,11 +13,19 @@ export class ParseFile implements PipeTransform {
     metadata: ArgumentMetadata,
   ): Express.Multer.File | Express.Multer.File[] {
     if (files === undefined || files === null) {
-      throw new BadRequestException('Validation failed (file expected)');
+      throw new GameApiException(
+        'Validation failed (file expected)',
+        '',
+        GameApiHttpStatus.BAD_REQUEST,
+      );
     }
 
     if (Array.isArray(files) && files.length === 0) {
-      throw new BadRequestException('Validation failed (files expected)');
+      throw new GameApiException(
+        'Validation failed (file expected)',
+        '',
+        GameApiHttpStatus.BAD_REQUEST,
+      );
     }
 
     return files;

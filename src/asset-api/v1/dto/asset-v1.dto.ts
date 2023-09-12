@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsBoolean, IsString, IsUrl } from 'class-validator';
 
-export class AssetDto {
+export class AssetInfoDto {
   @ApiProperty({
     example: 'https://image01.c2x.world/equip_92053030.gif',
     description: 'image url',
